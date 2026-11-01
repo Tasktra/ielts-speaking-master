@@ -1,11 +1,18 @@
-// app.js - IELTS Speaking Master Interactive Web Application for Yiğit
+/* ==========================================================================
+   app.js - IELTS Speaking Master Interactive Web Application (Yiğit Özel Sürüm)
+   Complete Application Logic: Auth Gate, Navigation, Band Calculator, Tips,
+   Fluency TTS, 50 Grammar Rules, 107 Idioms, Simulator & Voice Studio, Quiz,
+   28-Day Study Plan, Global Fuzzy Search & Dark/Light Theme.
+   Author: Antigravity Agentic Team
+   ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
-  initNavigation();
+  initAuth();
   initTheme();
+  initNavigation();
   initBandCalculator();
   initEssentialTips();
-  initFluencyTTS();
+  initFluencyModule();
   initGrammarRules();
   initIdioms();
   initSimulator();
@@ -15,91 +22,282 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ==========================================================================
-   1. NAVIGATION & LAYOUT
+   1. AUTHENTICATION & PASSWORD PROTECTION (Yigit0089)
    ========================================================================== */
+const AUTH_PASSWORD_HASH = 'Yigit0089';
+const AUTH_STORAGE_KEY = 'yigit_ielts_auth';
+
+function checkAuth() {
+  return localStorage.getItem(AUTH_STORAGE_KEY) === 'authenticated';
+}
+
+function authenticate(password) {
+  if (password === AUTH_PASSWORD_HASH) {
+    localStorage.setItem(AUTH_STORAGE_KEY, 'authenticated');
+    return true;
+  }
+  return false;
+}
+
+function logout() {
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+  const overlay = document.getElementById('auth-overlay');
+  const input = document.getElementById('auth-password-input');
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    if (input) {
+      input.value = '';
+      setTimeout(() => input.focus(), 300);
+    }
+  }
+  showToast('Portal kilitlendi. Yeniden şifre giriniz.', '🔒');
+}
+
+function initAuth() {
+  const overlay = document.getElementById('auth-overlay');
+  const form = document.getElementById('auth-form');
+  const input = document.getElementById('auth-password-input');
+  const submitBtn = document.getElementById('btn-auth-submit');
+  const togglePwdBtn = document.getElementById('btn-toggle-password');
+  const errorMsg = document.getElementById('auth-error-msg');
+  
+  const lockSidebar = document.getElementById('btn-lock-sidebar');
+  const lockTop = document.getElementById('btn-lock-top');
+  const lockSheet = document.getElementById('btn-lock-sheet');
+
+  if (checkAuth()) {
+    if (overlay) overlay.classList.add('hidden');
+  } else {
+    if (overlay) overlay.classList.remove('hidden');
+    if (input) setTimeout(() => input.focus(), 250);
+  }
+
+  function handleLogin() {
+    const entered = (input ? input.value : '').trim();
+    if (authenticate(entered)) {
+      if (errorMsg) errorMsg.classList.remove('visible');
+      if (overlay) overlay.classList.add('hidden');
+      showToast('Hoş geldin Yiğit! Başarılar dileriz.', '🎓');
+    } else {
+      if (errorMsg) {
+        errorMsg.classList.remove('visible');
+        void errorMsg.offsetWidth; // trigger reflow for shake
+        errorMsg.classList.add('visible');
+      }
+      if (input) {
+        input.select();
+        input.focus();
+      }
+    }
+  }
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleLogin();
+    });
+  }
+
+  if (submitBtn) {
+    submitBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleLogin();
+    });
+  }
+
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleLogin();
+      }
+    });
+  }
+
+  if (togglePwdBtn && input) {
+    togglePwdBtn.addEventListener('click', () => {
+      if (input.type === 'password') {
+        input.type = 'text';
+        togglePwdBtn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        togglePwdBtn.textContent = '👁️';
+      }
+    });
+  }
+
+  // Logout / Lock listeners
+  if (lockSidebar) lockSidebar.addEventListener('click', logout);
+  if (lockTop) lockTop.addEventListener('click', logout);
+  if (lockSheet) {
+    lockSheet.addEventListener('click', () => {
+      closeMoreSheet();
+      logout();
+    });
+  }
+}
+
+/* ==========================================================================
+   2. DARK / LIGHT THEME MANAGEMENT
+   ========================================================================== */
+const THEME_STORAGE_KEY = 'yigit_theme';
+
+function initTheme() {
+  const btnToggleTop = document.getElementById('btn-theme-toggle');
+  const btnToggleSheet = document.getElementById('btn-theme-toggle-sheet');
+
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+
+  applyTheme(initialTheme);
+
+  function toggleTheme() {
+    const current = document.body.getAttribute('data-theme') || 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem(THEME_STORAGE_KEY, next);
+    showToast(`${next === 'dark' ? 'Gece Modu 🌙' : 'Gündüz Modu ☀️'} devrede.`, '🎨');
+  }
+
+  if (btnToggleTop) btnToggleTop.addEventListener('click', toggleTheme);
+  if (btnToggleSheet) {
+    btnToggleSheet.addEventListener('click', () => {
+      toggleTheme();
+      closeMoreSheet();
+    });
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  document.body.setAttribute('data-theme', theme);
+
+  const btnToggleTop = document.getElementById('btn-theme-toggle');
+  const icon = theme === 'dark' ? '☀️' : '🌙';
+  if (btnToggleTop) btnToggleTop.textContent = icon;
+}
+
+/* ==========================================================================
+   3. NAVIGATION & MOBILE BOTTOM SHEET
+   ========================================================================== */
+const ACTIVE_TAB_KEY = 'yigit_active_tab';
+
 function initNavigation() {
-  const navLinks = document.querySelectorAll('.nav-link');
-  const sections = document.querySelectorAll('.view-section');
-  const mobileToggle = document.getElementById('btn-toggle-sidebar');
-  const sidebar = document.getElementById('sidebar');
-  const quickRecordBtn = document.getElementById('btn-quick-record');
+  const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
+  const bottomNavItems = document.querySelectorAll('.bottom-nav-item[data-target]');
+  const sheetItems = document.querySelectorAll('.sheet-item[data-target]');
+  const btnMobileMore = document.getElementById('btn-mobile-more');
+  const backdrop = document.getElementById('more-sheet-backdrop');
+  const btnCloseSheet = document.getElementById('btn-close-sheet');
 
-  function switchTab(targetId, saveState = true) {
-    navLinks.forEach(l => l.classList.remove('active'));
-    sections.forEach(s => s.classList.remove('active'));
+  // Switch tab function
+  window.switchTab = function(targetId, saveState = true) {
+    if (!targetId) return;
 
-    const activeLink = document.querySelector(`.nav-link[data-target="${targetId}"]`);
-    const activeSection = document.getElementById(`sec-${targetId}`);
+    // Remove active state
+    sidebarLinks.forEach(l => l.classList.remove('active'));
+    bottomNavItems.forEach(b => b.classList.remove('active'));
+    sheetItems.forEach(s => s.classList.remove('active'));
 
-    if (activeLink) activeLink.classList.add('active');
-    if (activeSection) {
-      activeSection.classList.add('active');
+    const allSections = document.querySelectorAll('.view-section');
+    allSections.forEach(sec => sec.classList.remove('active'));
+
+    // Set active link in sidebar
+    const activeSidebar = document.querySelector(`.sidebar .nav-link[data-target="${targetId}"]`);
+    if (activeSidebar) activeSidebar.classList.add('active');
+
+    // Set active link in bottom nav
+    const activeBottom = document.querySelector(`.bottom-nav-item[data-target="${targetId}"]`);
+    if (activeBottom) activeBottom.classList.add('active');
+
+    // Set active in sheet
+    const activeSheet = document.querySelector(`.sheet-item[data-target="${targetId}"]`);
+    if (activeSheet) activeSheet.classList.add('active');
+
+    // Show target section
+    const targetSection = document.getElementById(`sec-${targetId}`);
+    if (targetSection) {
+      targetSection.classList.add('active');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     if (saveState) {
-      localStorage.setItem('yigit_active_tab', targetId);
+      localStorage.setItem(ACTIVE_TAB_KEY, targetId);
     }
 
-    if (sidebar && sidebar.classList.contains('open')) {
-      sidebar.classList.remove('open');
-    }
-  }
+    closeMoreSheet();
+  };
 
-  // Restore saved tab on load
-  const savedTab = localStorage.getItem('yigit_active_tab');
-  if (savedTab && document.getElementById(`sec-${savedTab}`)) {
-    switchTab(savedTab, false);
-  }
-
-  navLinks.forEach(link => {
+  // Attach click listeners to sidebar links
+  sidebarLinks.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const target = link.getAttribute('data-target');
-      switchTab(target);
+      window.switchTab(target);
     });
   });
 
-  if (quickRecordBtn) {
-    quickRecordBtn.addEventListener('click', () => switchTab('simulator'));
-  }
+  // Attach click listeners to bottom nav
+  bottomNavItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = item.getAttribute('data-target');
+      window.switchTab(target);
+    });
+  });
 
-  if (mobileToggle && sidebar) {
-    mobileToggle.addEventListener('click', () => {
-      sidebar.classList.toggle('open');
+  // Attach click listeners to sheet items
+  sheetItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = item.getAttribute('data-target');
+      window.switchTab(target);
+    });
+  });
+
+  // Mobile More sheet controls
+  if (btnMobileMore) {
+    btnMobileMore.addEventListener('click', () => {
+      openMoreSheet();
     });
   }
+
+  if (backdrop) {
+    backdrop.addEventListener('click', () => {
+      closeMoreSheet();
+    });
+  }
+
+  if (btnCloseSheet) {
+    btnCloseSheet.addEventListener('click', () => {
+      closeMoreSheet();
+    });
+  }
+
+  // Restore saved active tab
+  const savedTab = localStorage.getItem(ACTIVE_TAB_KEY) || 'band-calc';
+  window.switchTab(savedTab, false);
+}
+
+function openMoreSheet() {
+  const sheet = document.getElementById('more-sheet');
+  const backdrop = document.getElementById('more-sheet-backdrop');
+  if (sheet) sheet.classList.add('visible');
+  if (backdrop) backdrop.classList.add('visible');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMoreSheet() {
+  const sheet = document.getElementById('more-sheet');
+  const backdrop = document.getElementById('more-sheet-backdrop');
+  if (sheet) sheet.classList.remove('visible');
+  if (backdrop) backdrop.classList.remove('visible');
+  document.body.style.overflow = '';
 }
 
 /* ==========================================================================
-   2. THEME CONTROLLER
-   ========================================================================== */
-function initTheme() {
-  const themeToggle = document.getElementById('btn-theme-toggle');
-  const themeIcon = document.getElementById('theme-icon');
-  const savedTheme = localStorage.getItem('yigit_ielts_theme') || 'light';
-
-  function setTheme(t) {
-    document.body.setAttribute('data-theme', t);
-    localStorage.setItem('yigit_ielts_theme', t);
-    if (themeIcon) {
-      themeIcon.textContent = t === 'dark' ? '☀️' : '🌙';
-    }
-  }
-
-  setTheme(savedTheme);
-
-  if (themeToggle) {
-    themeToggle.addEventListener('click', () => {
-      const cur = document.body.getAttribute('data-theme') || 'light';
-      setTheme(cur === 'dark' ? 'light' : 'dark');
-      showToast(cur === 'dark' ? 'Açık tema aktifleştirildi' : 'Karanlık tema aktifleştirildi', '🎨');
-    });
-  }
-}
-
-/* ==========================================================================
-   3. BAND SCORE CALCULATOR (Official IELTS Rounding Algorithm)
+   4. BAND CALCULATOR MODULE
    ========================================================================== */
 function initBandCalculator() {
   const sliderFC = document.getElementById('slider-fc');
@@ -115,1042 +313,1798 @@ function initBandCalculator() {
   const calcScore = document.getElementById('calc-score');
   const calcStatus = document.getElementById('calc-status');
   const calcDetails = document.getElementById('calc-details');
+  const scoreCircle = document.getElementById('calc-score-circle');
 
-  // Restore saved band slider values
-  const savedSliders = JSON.parse(localStorage.getItem('yigit_band_sliders') || 'null');
-  if (savedSliders) {
-    if (sliderFC && savedSliders.fc) sliderFC.value = savedSliders.fc;
-    if (sliderLR && savedSliders.lr) sliderLR.value = savedSliders.lr;
-    if (sliderGRA && savedSliders.gra) sliderGRA.value = savedSliders.gra;
-    if (sliderPR && savedSliders.pr) sliderPR.value = savedSliders.pr;
+  const btnPresetTarget = document.getElementById('preset-target');
+  const btnPresetSolid = document.getElementById('preset-solid');
+  const btnPresetReset = document.getElementById('preset-reset');
+
+  const SLIDERS_STORAGE_KEY = 'yigit_band_sliders';
+
+  // Restore saved slider values
+  try {
+    const saved = JSON.parse(localStorage.getItem(SLIDERS_STORAGE_KEY));
+    if (saved) {
+      if (sliderFC && saved.fc) sliderFC.value = saved.fc;
+      if (sliderLR && saved.lr) sliderLR.value = saved.lr;
+      if (sliderGRA && saved.gra) sliderGRA.value = saved.gra;
+      if (sliderPR && saved.pr) sliderPR.value = saved.pr;
+    }
+  } catch (err) {
+    console.warn('Slider load error:', err);
   }
 
   function calculateBand() {
-    if (!sliderFC || !sliderLR || !sliderGRA || !sliderPR) return;
-    const fc = parseFloat(sliderFC.value);
-    const lr = parseFloat(sliderLR.value);
-    const gra = parseFloat(sliderGRA.value);
-    const pr = parseFloat(sliderPR.value);
-
-    localStorage.setItem('yigit_band_sliders', JSON.stringify({ fc, lr, gra, pr }));
+    const fc = parseFloat(sliderFC ? sliderFC.value : 8.5);
+    const lr = parseFloat(sliderLR ? sliderLR.value : 8.5);
+    const gra = parseFloat(sliderGRA ? sliderGRA.value : 8.5);
+    const pr = parseFloat(sliderPR ? sliderPR.value : 8.5);
 
     if (valFC) valFC.textContent = fc.toFixed(1);
     if (valLR) valLR.textContent = lr.toFixed(1);
     if (valGRA) valGRA.textContent = gra.toFixed(1);
     if (valPR) valPR.textContent = pr.toFixed(1);
 
-    const rawAvg = (fc + lr + gra + pr) / 4;
-    const whole = Math.floor(rawAvg);
-    const fraction = rawAvg - whole;
-    let rounded = whole;
+    const average = (fc + lr + gra + pr) / 4;
+    const whole = Math.floor(average);
+    const remainder = average - whole;
 
-    if (fraction < 0.25) {
-      rounded = whole;
-    } else if (fraction >= 0.25 && fraction < 0.75) {
-      rounded = whole + 0.5;
+    let overallBand;
+    if (remainder < 0.25) {
+      overallBand = whole;
+    } else if (remainder < 0.75) {
+      overallBand = whole + 0.5;
     } else {
-      rounded = whole + 1.0;
+      overallBand = whole + 1.0;
     }
 
-    if (calcScore) calcScore.textContent = rounded.toFixed(1);
+    if (calcScore) calcScore.textContent = overallBand.toFixed(1);
 
-    let status = '';
-    if (rounded >= 8.5) status = 'Kusursuz - Uzman ve Yerli Düzey (Expert Speaker)';
-    else if (rounded >= 8.0) status = 'Mükemmel - Çok İleri Düzey Yetkin Konuşmacı';
-    else if (rounded >= 7.5) status = 'Çok İyi - Akıcı ve Doğal İleri Seviye (Yiğit Hedef Bandı)';
-    else if (rounded >= 7.0) status = 'İyi - Yetkin ve Hatasız Cümle Üretebilen Konuşmacı';
-    else if (rounded >= 6.5) status = 'Orta-İleri - Sınırda (Hatasız Cümle Sayısı Artırılmalı)';
-    else status = 'Geliştirilmeli - Temel Gramer ve Kelime Eksikleri Var';
+    // Save to localStorage
+    localStorage.setItem(SLIDERS_STORAGE_KEY, JSON.stringify({
+      fc, lr, gra, pr, overall: overallBand
+    }));
 
-    if (calcStatus) calcStatus.textContent = status;
-    if (calcDetails) {
-      calcDetails.textContent = `Ham Ortalama: ${rawAvg.toFixed(3)} ➔ Resmi IELTS Yuvarlaması ile Band ${rounded.toFixed(1)}`;
+    // Update Band Descriptor Description
+    updateDescriptor(overallBand);
+
+    // Visual score bounce
+    if (scoreCircle) {
+      scoreCircle.style.transform = 'scale(1.06)';
+      setTimeout(() => { scoreCircle.style.transform = 'scale(1)'; }, 200);
     }
   }
 
-  [sliderFC, sliderLR, sliderGRA, sliderPR].forEach(s => {
-    if (s) s.addEventListener('input', calculateBand);
+  function updateDescriptor(band) {
+    if (!calcStatus || !calcDetails) return;
+
+    if (band >= 8.5) {
+      calcStatus.textContent = '🌟 Band 8.5 - 9.0: Uzman & Kusursuz Konuşucu (Expert User)';
+      calcDetails.textContent = 'Yiğitçiğim, bu seviyede dil kullanımı tamamen doğal ve akıcıdır. Nadir ve küçük dil sürçmeleri dışında kusursuz gramer ve zengin deyimsel hakimiyet sergilenir.';
+    } else if (band >= 8.0) {
+      calcStatus.textContent = '🎯 Band 8.0: Çok İyi Kullanıcı (Very Good User)';
+      calcDetails.textContent = 'Akıcı, nadiren duraksayan, karmaşık cümle yapılarını ve deyimleri büyük oranda hatasız kullanan üstün seviye. Hedef bandın burası!';
+    } else if (band >= 7.5) {
+      calcStatus.textContent = '✨ Band 7.5: Güçlü ve Yetkin Konuşucu (Good User+)';
+      calcDetails.textContent = 'Rahat ve detaylı konuşma, geniş kelime haznesi, ara sıra küçük edat/tanımlık hataları olsa da anlamı asla bozmayan akıcı performans.';
+    } else if (band >= 7.0) {
+      calcStatus.textContent = '👍 Band 7.0: İyi Kullanıcı (Good User)';
+      calcDetails.textContent = 'Genellikle akıcı, karmaşık yapıları denemeye istekli fakat zaman zaman kelime arama veya hafif telaffuz tutukluğu yaşayan seviye.';
+    } else if (band >= 6.0) {
+      calcStatus.textContent = '⚠️ Band 6.0 - 6.5: Yetkin Kullanıcı (Competent User)';
+      calcDetails.textContent = 'Temel konularda anlaşılır konuşabilen fakat karmaşık fikirlerde sık sık duraksayan, sınırlı bağlaç kullanan ve gramer hataları yapan seviye.';
+    } else {
+      calcStatus.textContent = '📚 Band 5.5 ve Altı: Geliştirilmesi Gereken Seviye';
+      calcDetails.textContent = 'Sık tekrarlar, yavaş konuşma temposu, temel zaman ve edat hataları. 28 günlük plan ve 50 kuralı dikkatle çalış.';
+    }
+  }
+
+  // Bind input listeners
+  [sliderFC, sliderLR, sliderGRA, sliderPR].forEach(sl => {
+    if (sl) sl.addEventListener('input', calculateBand);
   });
 
+  // Presets
+  if (btnPresetTarget) {
+    btnPresetTarget.addEventListener('click', () => {
+      if (sliderFC) sliderFC.value = 8.5;
+      if (sliderLR) sliderLR.value = 8.5;
+      if (sliderGRA) sliderGRA.value = 8.5;
+      if (sliderPR) sliderPR.value = 8.5;
+      calculateBand();
+      showToast('Hedef Band 8.5 yüklendi.', '🎯');
+    });
+  }
+
+  if (btnPresetSolid) {
+    btnPresetSolid.addEventListener('click', () => {
+      if (sliderFC) sliderFC.value = 7.5;
+      if (sliderLR) sliderLR.value = 8.0;
+      if (sliderGRA) sliderGRA.value = 7.5;
+      if (sliderPR) sliderPR.value = 7.5;
+      calculateBand();
+      showToast('Güvenli Band 7.5 yüklendi.', '✨');
+    });
+  }
+
+  if (btnPresetReset) {
+    btnPresetReset.addEventListener('click', () => {
+      if (sliderFC) sliderFC.value = 6.5;
+      if (sliderLR) sliderLR.value = 6.5;
+      if (sliderGRA) sliderGRA.value = 6.5;
+      if (sliderPR) sliderPR.value = 6.5;
+      calculateBand();
+      showToast('Değerler sıfırlandı.', '🔄');
+    });
+  }
+
+  // Initial calculation
   calculateBand();
 }
 
 /* ==========================================================================
-   4. ESSENTIAL TIPS (Kitap Sayfa 37 - 42)
+   5. TEXT-TO-SPEECH (TTS) ENGINE FOR ENGLISH ONLY
+   ========================================================================== */
+function cleanEnglishForSpeech(raw) {
+  if (!raw) return '';
+  return raw
+    // 1. Remove parenthesized Turkish translations, e.g. (Tercih ederdim)
+    .replace(/\([^)]*\)/g, ' ')
+    // 2. Remove square brackets [like this]
+    .replace(/\[[^\]]*\]/g, ' ')
+    // 3. Remove curly braces {like this}
+    .replace(/\{[^}]*\}/g, ' ')
+    // 4. Remove Turkish annotations after pipe '|'
+    .split('|')[0]
+    // 5. Remove quotes, bullet symbols
+    .replace(/["“”«»👉•]/g, '')
+    // 6. Clean multiple spaces
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function speakText(text, triggerBtn = null) {
+  if (!('speechSynthesis' in window)) {
+    showToast('Tarayıcınız sesli telaffuzu (TTS) desteklemiyor.', '⚠️');
+    return;
+  }
+
+  const clean = cleanEnglishForSpeech(text);
+  if (!clean) return;
+
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.lang = 'en-GB';
+  utterance.rate = 0.92; // Slightly natural pace for IELTS clarity
+  utterance.pitch = 1.0;
+
+  // Visual playing feedback on trigger button
+  if (triggerBtn) {
+    triggerBtn.classList.add('playing');
+    utterance.onend = () => triggerBtn.classList.remove('playing');
+    utterance.onerror = () => triggerBtn.classList.remove('playing');
+  }
+
+  // Attempt to select an authentic English voice
+  const voices = window.speechSynthesis.getVoices();
+  const englishVoice = voices.find(v => v.lang === 'en-GB' || v.lang === 'en-US' || v.name.includes('English'));
+  if (englishVoice) {
+    utterance.voice = englishVoice;
+  }
+
+  window.speechSynthesis.speak(utterance);
+}
+
+// Global click delegation for all .btn-speak elements
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn-speak');
+  if (btn) {
+    const text = btn.getAttribute('data-speak');
+    if (text) speakText(text, btn);
+  }
+});
+
+/* ==========================================================================
+   6. ESSENTIAL TIPS MODULE (PAGES 37 - 42)
    ========================================================================== */
 function initEssentialTips() {
   const container = document.getElementById('tips-container');
-  const filterChips = document.querySelectorAll('[data-tips-filter]');
+  const filterChips = document.querySelectorAll('#tips-filter-bar .chip');
 
   if (!container || typeof ESSENTIAL_TIPS === 'undefined') return;
 
   function renderTips(filter = 'all') {
     let html = '';
 
-    // PART 1 (Sayfa 37 - 38)
+    // PART 1 (Pages 37-38)
     if (filter === 'all' || filter === 'part1') {
       const p1 = ESSENTIAL_TIPS.part1;
       html += `
-        <div class="tip-box highlight" style="margin-top: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h3 style="color: var(--brand-blue); font-size: 16px;">📌 ${p1.title}</h3>
-            <span class="badge badge-primary">Kitap Sayfa 37 - 38</span>
+        <div class="tip-card" id="tip-card-part1">
+          <div class="tip-card-header">
+            <div class="rule-number-badge">P1</div>
+            <div>
+              <h3 class="tip-title">${p1.title}</h3>
+              <span class="badge badge-primary">Kitap Sayfa 37 – 38</span>
+            </div>
           </div>
-          <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 12px;">${p1.desc}</p>
+          <p class="card-desc" style="margin-bottom: 14px;">${p1.desc}</p>
           
-          <div style="background: var(--bg-subtle); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-            <strong style="font-size: 12px; text-transform: uppercase; color: var(--brand-blue);">Kitaptaki Örnek Sorular (Sample Questions):</strong>
-            <ul style="margin: 6px 0 0 18px; font-size: 13px;">
-              ${(p1.sampleQuestions || []).map(q => `<li><strong>${q}</strong></li>`).join('')}
-            </ul>
+          <div style="background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-md); margin-bottom: 14px;">
+            <strong style="font-size: 13px; color: var(--brand-blue); display: block; margin-bottom: 8px;">Örnek Part 1 Başlangıç Soruları:</strong>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              ${(p1.sampleQuestions || []).map(q => `
+                <div style="font-size: 13px; display: flex; align-items: center; justify-content: space-between;">
+                  <span>${q}</span>
+                  <button class="btn-speak" data-speak="${q}">🔊 Dinle</button>
+                </div>
+              `).join('')}
+            </div>
           </div>
 
-          <!-- Rules -->
+          <!-- Rules in Part 1 -->
           ${(p1.rules || []).map(r => `
-            <div style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px;">
-              <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">Kural ${r.num}: ${r.title}</h4>
-              ${r.dialogue ? `
-                <div style="background: var(--bg-subtle); border-left: 3px solid var(--brand-blue); padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 8px;">
-                  <div><strong>Examiner:</strong> ${r.dialogue.examiner}</div>
-                  <div style="margin-top: 4px;"><strong>Candidate:</strong> ${r.dialogue.candidate}</div>
-                </div>
-              ` : ''}
-              ${r.dialogueNegative ? `
-                <div style="background: var(--bg-subtle); border-left: 3px solid #dc2626; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 8px;">
-                  <div><strong>Examiner:</strong> ${r.dialogueNegative.examiner}</div>
-                  <div style="margin-top: 4px;"><strong>Candidate:</strong> ${r.dialogueNegative.candidate}</div>
-                </div>
-              ` : ''}
-              ${r.phrases ? `
-                <div style="background: var(--bg-subtle); padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 8px;">
-                  <strong style="color: var(--brand-blue);">Kitaptaki Soru Anlaşılmadığında Kullanılacak Kalıplar:</strong>
-                  <ul style="margin: 4px 0 0 18px;">
-                    ${r.phrases.map(cp => `<li><em>"${cp}"</em></li>`).join('')}
-                  </ul>
-                </div>
-              ` : ''}
-              <div class="teacher-note">
-                <span class="avatar">👨‍🏫</span>
-                <div class="teacher-note-text"><strong>Öğretmen Tavsiyesi:</strong> ${r.teacherTip}</div>
+            <div style="border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 12px; background: var(--bg-card);">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span class="badge badge-purple">Kural ${r.num}</span>
+                <strong style="font-size: 14px; color: var(--text-main);">${r.title}</strong>
               </div>
+
+              ${r.dialogue ? `
+                <div class="dialogue-box">
+                  <div class="dialogue-row">
+                    <span class="role-badge role-examiner">Examiner</span>
+                    <span class="dialogue-text">${r.dialogue.examiner}</span>
+                    <button class="btn-speak" data-speak="${r.dialogue.examiner}">🔊</button>
+                  </div>
+                  <div class="dialogue-row">
+                    <span class="role-badge role-candidate">Yiğit</span>
+                    <span class="dialogue-text">${r.dialogue.candidate}</span>
+                    <button class="btn-speak" data-speak="${r.dialogue.candidate}">🔊</button>
+                  </div>
+                </div>
+              ` : ''}
+
+              ${r.dialogueNegative ? `
+                <div class="dialogue-box">
+                  <div class="dialogue-row">
+                    <span class="role-badge role-examiner">Examiner</span>
+                    <span class="dialogue-text">${r.dialogueNegative.examiner}</span>
+                    <button class="btn-speak" data-speak="${r.dialogueNegative.examiner}">🔊</button>
+                  </div>
+                  <div class="dialogue-row">
+                    <span class="role-badge role-candidate">Yiğit (Olumsuz Cevap)</span>
+                    <span class="dialogue-text">${r.dialogueNegative.candidate}</span>
+                    <button class="btn-speak" data-speak="${r.dialogueNegative.candidate}">🔊</button>
+                  </div>
+                </div>
+              ` : ''}
+
+              ${r.teacherTip ? `
+                <div class="teacher-note">
+                  <span class="teacher-avatar">👨‍🏫</span>
+                  <div class="teacher-note-text">
+                    <strong>Öğretmen Notu:</strong> ${r.teacherTip}
+                  </div>
+                </div>
+              ` : ''}
             </div>
           `).join('')}
         </div>
       `;
     }
 
-    // PART 2 (Sayfa 39 - 40)
+    // PART 2 (Pages 39-40)
     if (filter === 'all' || filter === 'part2') {
       const p2 = ESSENTIAL_TIPS.part2;
       html += `
-        <div class="tip-box highlight" style="margin-top: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h3 style="color: var(--brand-blue); font-size: 16px;">📌 ${p2.title}</h3>
-            <span class="badge badge-warning">Kitap Sayfa 39 - 40</span>
-          </div>
-          <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 12px;">${p2.desc}</p>
-          
-          ${p2.sampleTask ? `
-            <div class="cue-card-box" style="margin-bottom: 16px;">
-              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #b45309; margin-bottom: 4px;">Kitaptaki Örnek Görev (Sample Task):</div>
-              <div style="font-size: 15px; font-weight: 800; margin-bottom: 6px;">${p2.sampleTask.prompt}</div>
-              <ul style="margin-left: 20px; font-size: 13.5px;">
-                ${(p2.sampleTask.bullets || []).map(p => `<li>${p}</li>`).join('')}
-              </ul>
+        <div class="tip-card" id="tip-card-part2">
+          <div class="tip-card-header">
+            <div class="rule-number-badge" style="background: linear-gradient(135deg, #7c3aed, #a855f7);">P2</div>
+            <div>
+              <h3 class="tip-title">${p2.title}</h3>
+              <span class="badge badge-purple">Kitap Sayfa 39 – 40</span>
             </div>
-          ` : ''}
+          </div>
+          <p class="card-desc" style="margin-bottom: 14px;">${p2.desc}</p>
 
-          <!-- Rules -->
+          <!-- Rules in Part 2 -->
           ${(p2.rules || []).map(r => `
-            <div style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px;">
-              <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">Kural ${r.num}: ${r.title}</h4>
-              ${r.starters ? `
-                <div style="background: var(--bg-subtle); border-left: 3px solid var(--brand-blue); padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 8px;">
-                  <strong style="color: var(--brand-blue);">Kitaptaki Vurucu Girişler (Catchy Starters):</strong>
-                  <ul style="margin: 4px 0 0 18px;">
-                    ${r.starters.map(st => `<li><em>"${st}"</em></li>`).join('')}
-                  </ul>
-                </div>
-              ` : ''}
-              ${r.signposts ? `
-                <div style="background: var(--bg-subtle); padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 8px;">
-                  <strong style="color: var(--brand-blue);">Kullanılacak Geçiş Sinyalleri (Signposts):</strong>
-                  <ul style="margin: 4px 0 0 18px;">
-                    ${r.signposts.map(sp => `<li><em>"${sp}"</em></li>`).join('')}
-                  </ul>
-                </div>
-              ` : ''}
-              <div class="teacher-note">
-                <span class="avatar">👨‍🏫</span>
-                <div class="teacher-note-text"><strong>Öğretmen Tavsiyesi:</strong> ${r.teacherTip}</div>
+            <div style="border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 12px; background: var(--bg-card);">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span class="badge badge-warning">Kural ${r.num}</span>
+                <strong style="font-size: 14px; color: var(--text-main);">${r.title}</strong>
               </div>
+
+              ${r.content ? `<p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.5;">${r.content}</p>` : ''}
+
+              ${r.dialogue ? `
+                <div class="dialogue-box">
+                  <div class="dialogue-row">
+                    <span class="role-badge role-candidate">Örnek Giriş Cümlesi</span>
+                    <span class="dialogue-text">${r.dialogue.candidate}</span>
+                    <button class="btn-speak" data-speak="${r.dialogue.candidate}">🔊 Dinle</button>
+                  </div>
+                </div>
+              ` : ''}
+
+              ${r.teacherTip ? `
+                <div class="teacher-note">
+                  <span class="teacher-avatar">👨‍🏫</span>
+                  <div class="teacher-note-text">
+                    <strong>Öğretmen Notu:</strong> ${r.teacherTip}
+                  </div>
+                </div>
+              ` : ''}
             </div>
           `).join('')}
         </div>
       `;
     }
 
-    // PART 3 (Sayfa 41 - 42)
+    // PART 3 (Pages 40-41)
     if (filter === 'all' || filter === 'part3') {
       const p3 = ESSENTIAL_TIPS.part3;
       html += `
-        <div class="tip-box highlight" style="margin-top: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h3 style="color: var(--brand-blue); font-size: 16px;">📌 ${p3.title}</h3>
-            <span class="badge badge-success">Kitap Sayfa 41 - 42</span>
+        <div class="tip-card" id="tip-card-part3">
+          <div class="tip-card-header">
+            <div class="rule-number-badge" style="background: linear-gradient(135deg, #059669, #10b981);">P3</div>
+            <div>
+              <h3 class="tip-title">${p3.title}</h3>
+              <span class="badge badge-success">Kitap Sayfa 40 – 41</span>
+            </div>
           </div>
-          <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 12px;">${p3.desc}</p>
+          <p class="card-desc" style="margin-bottom: 14px;">${p3.desc}</p>
 
-          <div style="background: var(--bg-subtle); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-            <strong style="font-size: 12px; text-transform: uppercase; color: var(--brand-blue);">Kitaptaki Örnek Sorular (Sample Questions):</strong>
-            <ul style="margin: 6px 0 0 18px; font-size: 13px;">
-              ${(p3.sampleQuestions || []).map(q => `<li><strong>${q}</strong></li>`).join('')}
-            </ul>
-          </div>
-
-          <!-- Rules -->
+          <!-- Rules in Part 3 -->
           ${(p3.rules || []).map(r => `
-            <div style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; ${r.isGolden ? 'background: rgba(37,99,235,0.04); padding: 16px; border-radius: 8px; border: 2px solid var(--brand-blue);' : ''}">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                <h4 style="font-size: 14.5px; font-weight: 800; ${r.isGolden ? 'color: var(--brand-blue);' : ''}">Kural ${r.num}: ${r.title}</h4>
-                ${r.isGolden ? '<span class="badge badge-danger">⭐ ALTIN KURAL (KİTAP SAYFA 41)</span>' : ''}
+            <div style="border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 12px; background: var(--bg-card);">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span class="badge badge-primary">Kural ${r.num}</span>
+                <strong style="font-size: 14px; color: var(--text-main);">${r.title}</strong>
               </div>
-              <div class="teacher-note">
-                <span class="avatar">👨‍🏫</span>
-                <div class="teacher-note-text"><strong>Öğretmen Tavsiyesi:</strong> ${r.teacherTip}</div>
-              </div>
+
+              ${r.dialogue ? `
+                <div class="dialogue-box">
+                  <div class="dialogue-row">
+                    <span class="role-badge role-examiner">Examiner</span>
+                    <span class="dialogue-text">${r.dialogue.examiner}</span>
+                    <button class="btn-speak" data-speak="${r.dialogue.examiner}">🔊</button>
+                  </div>
+                  <div class="dialogue-row">
+                    <span class="role-badge role-candidate">Yiğit (Band 8+ Yanıt)</span>
+                    <span class="dialogue-text">${r.dialogue.candidate}</span>
+                    <button class="btn-speak" data-speak="${r.dialogue.candidate}">🔊</button>
+                  </div>
+                </div>
+              ` : ''}
+
+              ${r.recoveryQuestions ? `
+                <div style="background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-md); margin-top: 10px;">
+                  <strong style="font-size: 13px; color: var(--danger); display: block; margin-bottom: 6px;">İletişim Kurtarma Kalıpları (A, B, C):</strong>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    ${r.recoveryQuestions.map(q => `
+                      <div style="font-size: 13px; display: flex; align-items: center; justify-content: space-between;">
+                        <span>🔊 <em>"${q}"</em></span>
+                        <button class="btn-speak" data-speak="${q}">Dinle</button>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+
+              ${r.teacherTip ? `
+                <div class="teacher-note">
+                  <span class="teacher-avatar">👨‍🏫</span>
+                  <div class="teacher-note-text">
+                    <strong>Öğretmen Notu:</strong> ${r.teacherTip}
+                  </div>
+                </div>
+              ` : ''}
             </div>
           `).join('')}
         </div>
       `;
     }
 
-    // GENERAL RULES (Sayfa 42)
+    // GENERAL TIPS (Page 42)
     if (filter === 'all' || filter === 'general') {
       const gen = ESSENTIAL_TIPS.general;
-      html += `
-        <div class="tip-box highlight" style="margin-top: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h3 style="color: var(--brand-blue); font-size: 16px;">📌 ${gen.title}</h3>
-            <span class="badge badge-purple">Kitap Sayfa 42</span>
-          </div>
-
-          ${(gen.rules || []).map(r => `
-            <div style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px;">
-              <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">Kural ${r.num}: ${r.title}</h4>
-              <div class="teacher-note">
-                <span class="avatar">👨‍🏫</span>
-                <div class="teacher-note-text"><strong>Öğretmen Tavsiyesi:</strong> ${r.teacherTip}</div>
+      if (gen) {
+        html += `
+          <div class="tip-card" id="tip-card-general">
+            <div class="tip-card-header">
+              <div class="rule-number-badge" style="background: linear-gradient(135deg, #d97706, #f59e0b);">GEN</div>
+              <div>
+                <h3 class="tip-title">${gen.title || 'Genel Sınav Kuralları & Taktikler'}</h3>
+                <span class="badge badge-warning">Kitap Sayfa 42</span>
               </div>
             </div>
-          `).join('')}
-        </div>
-      `;
+            
+            ${(gen.rules || []).map(r => `
+              <div style="border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 12px; background: var(--bg-card);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span class="badge badge-neutral">Kural ${r.num}</span>
+                  <strong style="font-size: 14px; color: var(--text-main);">${r.title}</strong>
+                </div>
+                ${r.content ? `<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 8px;">${r.content}</p>` : ''}
+                ${r.teacherTip ? `
+                  <div class="teacher-note">
+                    <span class="teacher-avatar">👨‍🏫</span>
+                    <div class="teacher-note-text">
+                      <strong>Öğretmen Notu:</strong> ${r.teacherTip}
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
     }
 
     container.innerHTML = html;
   }
 
+  // Filter button handlers
   filterChips.forEach(chip => {
     chip.addEventListener('click', () => {
       filterChips.forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      renderTips(chip.getAttribute('data-tips-filter'));
+      const f = chip.getAttribute('data-tips-filter');
+      renderTips(f);
     });
   });
 
+  // Initial render
   renderTips('all');
 }
 
 /* ==========================================================================
-   5. TTS AUDIO PLAYER (SpeechSynthesis)
+   7. FLUENCY & COHERENCE PHRASES (10 FUNCTIONAL CATEGORIES)
    ========================================================================== */
-function cleanEnglishForSpeech(raw) {
-  if (!raw) return '';
-  return raw
-    // 1. Remove all parentheses contents (e.g. Turkish translations like '(Telefon çaldığında...)')
-    .replace(/\([^)]*\)/g, ' ')
-    // 2. Remove square brackets [like this]
-    .replace(/\[[^\]]*\]/g, ' ')
-    // 3. Remove curly braces
-    .replace(/\{[^}]*\}/g, ' ')
-    // 4. Remove Turkish annotations after pipe '|'
-    .split('|')[0]
-    // 5. Remove quotes and clean spaces
-    .replace(/["“”«»]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function speakText(text) {
-  if (!('speechSynthesis' in window)) {
-    showToast('Tarayıcınız ses sentezini desteklemiyor.', '⚠️');
-    return;
+const FLUENCY_CATEGORIES_DATA = [
+  {
+    id: 'preference',
+    title: '1. Expressing Preference (Tercih Belirtme)',
+    desc: 'Part 1 ve Part 3’te "hangisini tercih edersin?" sorularında sıradan "I like / I prefer" yerine Band 8+ yapılar:',
+    badge: 'Part 1 & 3',
+    phrases: [
+      {
+        en: "Given the choice between the two, I would almost always opt for the former.",
+        tr: "(İkisi arasında bir seçim hakkım olsa, neredeyse her zaman ilkini tercih ederdim.)"
+      },
+      {
+        en: "I'd much rather spend an evening reading at home than go out to a noisy venue.",
+        tr: "(Gürültülü bir mekana gitmektense akşamımı evde kitap okuyarak geçirmeyi kat kat tercih ederim.)"
+      },
+      {
+        en: "I have a distinct leaning towards modern architecture rather than classical styles.",
+        tr: "(Klasik tarzlar yerine modern mimariye karşı bariz bir yatkınlığım var.)"
+      },
+      {
+        en: "If it were entirely up to me, I would undoubtedly select the more flexible alternative.",
+        tr: "(Tamamen bana kalmış olsaydı, şüphesiz daha esnek olan alternatifi seçerdim.)"
+      }
+    ],
+    teacherTip: "Sınav görevlisine asla sadece 'I prefer tea' deme! 'Given the choice between tea and coffee, I would invariably opt for the latter' kalıbını kullan."
+  },
+  {
+    id: 'narrating',
+    title: '2. Narrating & Storytelling (Hikaye ve Olay Anlatma)',
+    desc: 'Part 2 Cue Card konuşmalarında olay akışını canlı ve akıcı kılmak için zaman bağlaçları:',
+    badge: 'Part 2 Cue Card',
+    phrases: [
+      {
+        en: "The first thing that springs to mind when reflecting on that memorable trip is the breathtaking scenery.",
+        tr: "(O unutulmaz geziyi düşündüğümde aklıma gelen ilk şey nefes kesici manzaraydı.)"
+      },
+      {
+        en: "To cut a long story short, what started as a trivial issue ended up becoming a life-changing experience.",
+        tr: "(Lafı fazla uzatmayayım, önemsiz bir mesele olarak başlayan şey sonunda hayatımı değiştiren bir deneyime dönüştü.)"
+      },
+      {
+        en: "Little did I know at the time that this spontaneous decision would have such far-reaching consequences.",
+        tr: "(O zamanlar, bu anlık kararın bu denli geniş çaplı sonuçları olacağından hiç haberim yoktu - Inversion yapısı!)"
+      },
+      {
+        en: "Before I knew it, everything had snowballed into an extraordinary adventure.",
+        tr: "(Ne olduğunu anlayamadan, her şey çığ gibi büyüyüp olağanüstü bir maceraya dönüştü.)"
+      }
+    ],
+    teacherTip: "Part 2 açılışında 'I am going to talk about...' demek yerine 'The first thing that springs to mind...' kalıbıyla başla, sınav görevlisi anında dikkat kesilir!"
+  },
+  {
+    id: 'comparing',
+    title: '3. Comparing & Contrasting (Karşılaştırma Yapma)',
+    desc: 'Part 3’te nesiller, ülkeler veya geçmiş ile günümüzü kıyaslarken kullanılacak üst düzey kalıplar:',
+    badge: 'Part 3 Akademik',
+    phrases: [
+      {
+        en: "There is a stark contrast between how the older generation communicated and how teenagers interact nowadays.",
+        tr: "(Eski neslin iletişim kurma şekli ile günümüz gençlerinin etkileşim biçimi arasında bariz bir tezat var.)"
+      },
+      {
+        en: "While traditional schooling offers structure, online platforms provide unparalleled flexibility.",
+        tr: "(Geleneksel okul eğitimi düzen sunarken, çevrim içi platformlar eşi benzeri görülmemiş bir esneklik sağlar.)"
+      },
+      {
+        en: "On the one hand, urbanization fuels economic growth; on the other hand, it puts immense strain on natural resources.",
+        tr: "(Bir yandan kentleşme ekonomik büyümeyi körüklerken; diğer yandan doğal kaynaklar üzerinde muazzam bir baskı yaratır.)"
+      },
+      {
+        en: "In sharp contrast to the past, remote working is now regarded as standard practice across multinational corporations.",
+        tr: "(Geçmişin tam tersine, uzaktan çalışma artık çok uluslu şirketlerde standart bir uygulama olarak kabul ediliyor.)"
+      }
+    ],
+    teacherTip: "Part 3 sorularında asla tek bir boyuttan bakma. 'On the one hand..., but when viewed from an alternative perspective...' şeklinde iki yönü de ele al."
+  },
+  {
+    id: 'suggesting',
+    title: '4. Suggesting & Recommending (Öneride Bulunma)',
+    desc: 'Toplumsal veya bireysel problemlere çözüm sunarken otoriter ve doğal kalıplar:',
+    badge: 'Part 3 Çözüm',
+    phrases: [
+      {
+        en: "One viable solution that governments might consider implementing is investing heavily in public transport.",
+        tr: "(Hükümetlerin hayata geçirmeyi düşünebileceği uygulanabilir bir çözüm, toplu taşımaya yoğun yatırım yapmaktır.)"
+      },
+      {
+        en: "It would be tremendously beneficial if educational curricula incorporated practical financial literacy.",
+        tr: "(Eğitim müfredatlarının pratik finansal okuryazarlığı içermesi muazzam derecede faydalı olurdu.)"
+      },
+      {
+        en: "A sensible first step would be to raise public awareness through targeted social media campaigns.",
+        tr: "(Mantıklı bir ilk adım, hedeflenmiş sosyal medya kampanyaları aracılığıyla halkın bilincini artırmak olacaktır.)"
+      },
+      {
+        en: "Perhaps the most pragmatic way forward is encouraging public-private partnerships.",
+        tr: "(Belki de ileriye dönük en pragmatik yol, kamu-özel ortaklıklarını teşvik etmektir.)"
+      }
+    ],
+    teacherTip: "Sadece 'Governments should do this' deme. 'One viable solution that deserves serious consideration is...' şeklinde akademik öneri iskeleti kur."
+  },
+  {
+    id: 'opinions',
+    title: '5. Giving Opinions & Stances (Fikir Beyan Etme)',
+    desc: 'Kişisel görüş belirtirken "I think" veya "In my opinion" yerine Band 8.5 varyasyonları:',
+    badge: 'Tüm Partlar',
+    phrases: [
+      {
+        en: "From my standpoint, technological literacy is no longer a luxury but an absolute prerequisite.",
+        tr: "(Benim bakış açıma göre, teknoloji okuryazarlığı artık bir lüks değil, mutlak bir ön koşuldur.)"
+      },
+      {
+        en: "I am firmly convinced that early childhood experiences shape our cognitive resilience later in life.",
+        tr: "(Erken çocukluk deneyimlerinin yaşamın ilerleyen dönemlerinde bilişsel dayanıklılığımızı şekillendirdiğine yürekten inanıyorum.)"
+      },
+      {
+        en: "As far as I can tell, people are becoming increasingly conscious of sustainable consumption.",
+        tr: "(Görebildiğim kadarıyla insanlar sürdürülebilir tüketim konusunda giderek daha bilinçli hale geliyorlar.)"
+      },
+      {
+        en: "I subscribe to the view that artificial intelligence will complement rather than replace human creativity.",
+        tr: "(Yapay zekanın insan yaratıcılığının yerini almaktan ziyade onu tamamlayacağı görüşünü benimsiyorum.)"
+      }
+    ],
+    teacherTip: "'I think' kelimesini sınav boyunca en fazla 1 kez kullan! Yerine 'From my standpoint' veya 'I am firmly convinced that' kalıplarını koy."
+  },
+  {
+    id: 'speculating',
+    title: '6. Speculating & Hypothesizing (Tahmin & İhtimaller)',
+    desc: 'Gelecek hakkında veya emin olmadığın konularda konuşurken kullanılan spekülatif kalıplar:',
+    badge: 'Part 3 Gelecek',
+    phrases: [
+      {
+        en: "Hypothetically speaking, if automated vehicles became ubiquitous, road accidents would plummet drastically.",
+        tr: "(Varsayımsal olarak konuşursak, otonom araçlar yaygınlaşırsa trafik kazaları ciddi oranda düşüşe geçer.)"
+      },
+      {
+        en: "It is widely anticipated that renewable energy will overtake fossil fuels within the next two decades.",
+        tr: "(Önümüzdeki yirmi yıl içinde yenilenebilir enerjinin fosil yakıtları geride bırakacağı yaygın şekilde tahmin edilmektedir.)"
+      },
+      {
+        en: "I wouldn't be surprised in the slightest if traditional retail shops gradually morphed into experiential showrooms.",
+        tr: "(Geleneksel perakende mağazalarının giderek deneyimsel sergi salonlarına dönüşmesi beni zerre kadar şaşırtmaz.)"
+      },
+      {
+        en: "There is every likelihood that telecommunication advances will render physical commuting virtually obsolete.",
+        tr: "(Telekomünikasyondaki ilerlemelerin işe fiziksel gidip gelmeyi neredeyse gereksiz kılma olasılığı oldukça yüksektir.)"
+      }
+    ],
+    teacherTip: "Part 3'te 'What will happen in 20 years?' sorusuna 'I think people will...' deme. 'There is every likelihood that...' ile başla!"
+  },
+  {
+    id: 'analyzing',
+    title: '7. Analyzing & Deconstructing (Derinlemesine Analiz)',
+    desc: 'Bir sorunun arkasındaki temel sebepleri ve mekanizmaları parça parça açıklarken:',
+    badge: 'Part 3 Neden-Sonuç',
+    phrases: [
+      {
+        en: "If we examine the root cause of this trend, it primarily stems from the relentless pace of urban life.",
+        tr: "(Bu eğilimin temel nedenini incelersek, öncelikli olarak şehir hayatının amansız temposundan kaynaklanmaktadır.)"
+      },
+      {
+        en: "This phenomenon can be attributed to a confluence of socio-economic factors.",
+        tr: "(Bu olgu, sosyo-ekonomik faktörlerin bir araya gelmesine bağlanabilir.)"
+      },
+      {
+        en: "To analyze this objectively, we need to distinguish between short-term hype and enduring behavioral change.",
+        tr: "(Bunu objektif olarak analiz etmek gerekirse, kısa vadeli popülerlik ile kalıcı davranışsal değişim arasında ayrım yapmalıyız.)"
+      },
+      {
+        en: "The underlying driving force behind this shift is undoubtedly consumer demand for instant gratification.",
+        tr: "(Bu değişimin arkasındaki temel itici güç, şüphesiz tüketicilerin anlık tatmin arzusudur.)"
+      }
+    ],
+    teacherTip: "'Because of money' gibi basit cevaplar yerine 'This can be largely attributed to socio-economic pressures' cümlesi Band 8 kapısını açar."
+  },
+  {
+    id: 'summarizing',
+    title: '8. Summarizing & Concluding (Özetleme & Bağlama)',
+    desc: 'Uzun bir cevabı toparlarken ve sonuca bağlarken akıcı kapanış ifadeleri:',
+    badge: 'Part 2 & 3 Kapanış',
+    phrases: [
+      {
+        en: "All things considered, it remains an indispensable milestone in both my personal and professional development.",
+        tr: "(Her şey hesaba katıldığında, hem kişisel hem de mesleki gelişimimde vazgeçilmez bir mihenk taşı olmaya devam ediyor.)"
+      },
+      {
+        en: "To encapsulate my main point, striking a balance between ambition and well-being is paramount.",
+        tr: "(Ana fikrimi özetlemek gerekirse, hırs ile esenlik arasında bir denge kurmak her şeyden önemlidir.)"
+      },
+      {
+        en: "When all is said and done, genuine human connection far outweighs any material accomplishment.",
+        tr: "(Son tahlilde her şey konuşulup bittiğinde, samimi insan ilişkisi her türlü maddi başarıdan kat kat üstündür.)"
+      },
+      {
+        en: "Ultimately, the benefits of this transition substantially outweigh the initial teething troubles.",
+        tr: "(Nihayetinde, bu geçişin faydaları başlangıçtaki alışma sancılarından çok daha ağır basmaktadır.)"
+      }
+    ],
+    teacherTip: "Part 2'de 2 dakikan dolmak üzereyken havada kalma. 'All things considered, ...' diyerek cevabını profesyonelce tamamla."
+  },
+  {
+    id: 'repair',
+    title: '9. Conversation Repair (İletişim Kurtarma & Açıklık İsteme)',
+    desc: 'Soruyu tam anlamadığında ya da kelimeyi hatırlayamadığında puan kaybetmeden kontrolü alma:',
+    badge: 'Kitap Sayfa 41 Kurtarma',
+    phrases: [
+      {
+        en: "Could you elaborate on what you mean by that, please?",
+        tr: "(Bununla neyi kastettiğinizi biraz daha açabilir misiniz lütfen? - Kural 9 Kalıp A)"
+      },
+      {
+        en: "Could you clarify what the term 'metropolitan sprawl' implies in this context?",
+        tr: "(Bu bağlamda 'metropolitan sprawl' teriminin ne anlama geldiğini açıklayabilir misiniz? - Kural 9 Kalıp B)"
+      },
+      {
+        en: "Would you mind repeating the question once more, please?",
+        tr: "(Soruyu bir kez daha tekrarlayabilir misiniz lütfen? - Kural 9 Kalıp C)"
+      },
+      {
+        en: "What I'm trying to get at is that the digital divide is exacerbating existing social inequalities.",
+        tr: "(Varmaya çalıştığım nokta şu ki, dijital uçurum var olan toplumsal eşitsizlikleri daha da derinleştiriyor.)"
+      }
+    ],
+    teacherTip: "Kitap Sayfa 41'deki kural: Anlamadığında 'What?' veya 'Pardon?' demek yasak! 'Could you explain what you mean by that, please?' dersen sınav görevlisi FC puanını kesmez."
+  },
+  {
+    id: 'fillers',
+    title: '10. Fillers & Stalling (Düşünme Payı Kazanma)',
+    desc: 'Zor veya soyut bir soru geldiğinde sessiz kalıp FC puanını düşürmemek için zaman kazanma şablonları:',
+    badge: 'Sıfır Duraksama',
+    phrases: [
+      {
+        en: "That's an intriguing question. To be completely honest, I haven't given it much thought before, but...",
+        tr: "(Oldukça merak uyandırıcı bir soru. Tamamen dürüst olmak gerekirse daha önce üzerinde pek düşünmemiştim fakat...)"
+      },
+      {
+        en: "Well, looking at it from an objective perspective, I'd say that...",
+        tr: "(Şöyle objektif bir açıdan bakacak olursak, diyebilirim ki...)"
+      },
+      {
+        en: "That's a rather multifaceted issue with no straightforward answer, but if I had to pinpoint the main reason...",
+        tr: "(Bu, tek ve basit bir yanıtı olmayan hayli çok boyutlu bir mesele; fakat ana nedeni işaret etmem gerekirse...)"
+      },
+      {
+        en: "That is certainly an interesting angle to consider. Off the top of my head, I suppose...",
+        tr: "(Bu kesinlikle dikkate değer ilginç bir bakış açısı. Aklıma ilk gelen şeyle söyleyecek olursam sanırım...)"
+      }
+    ],
+    teacherTip: "Bu kalıbı söylerken sınav görevlisinin gözlerinin içine bakarak konuş. Beynin cevabı hazırlarken ağzın duraksamadan aktığı için FC kriterin 8.5 kalır!"
   }
-  const clean = cleanEnglishForSpeech(text);
-  if (!clean) return;
+];
 
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.lang = 'en-GB';
-  utterance.rate = 0.92;
-  utterance.pitch = 1.0;
-  window.speechSynthesis.speak(utterance);
-}
+function initFluencyModule() {
+  const container = document.getElementById('fluency-container');
+  const filterChips = document.querySelectorAll('#fluency-filter-bar .chip');
 
-function initFluencyTTS() {
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.btn-speak');
-    if (btn) {
-      const text = btn.getAttribute('data-speak');
-      if (text) speakText(text);
+  if (!container) return;
+
+  function renderFluency(filter = 'all') {
+    const list = filter === 'all'
+      ? FLUENCY_CATEGORIES_DATA
+      : FLUENCY_CATEGORIES_DATA.filter(c => c.id === filter);
+
+    container.innerHTML = list.map(cat => `
+      <div class="fluency-category-card" id="fluency-cat-${cat.id}">
+        <div class="fluency-header">
+          <div class="fluency-cat-title">
+            <span>🗣️</span>
+            <span>${cat.title}</span>
+          </div>
+          <span class="badge badge-purple">${cat.badge}</span>
+        </div>
+        <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 14px;">${cat.desc}</p>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${cat.phrases.map((p, idx) => `
+            <div class="phrase-item">
+              <div class="phrase-en">"${p.en}"</div>
+              <div class="phrase-tr">${p.tr}</div>
+              <div class="phrase-actions">
+                <button class="btn-copy-phrase" data-copy="${p.en}">📋 Kopyala</button>
+                <button class="btn-speak" data-speak="${p.en}">🔊 Dinle</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        ${cat.teacherTip ? `
+          <div class="teacher-note">
+            <span class="teacher-avatar">👨‍🏫</span>
+            <div class="teacher-note-text">
+              <strong>Öğretmen Notu:</strong> ${cat.teacherTip}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `).join('');
+  }
+
+  // Filter chips listeners
+  filterChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      filterChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      const targetCat = chip.getAttribute('data-fluency-filter');
+      renderFluency(targetCat);
+    });
+  });
+
+  // Copy phrase button delegation
+  container.addEventListener('click', (e) => {
+    const copyBtn = e.target.closest('.btn-copy-phrase');
+    if (copyBtn) {
+      const textToCopy = copyBtn.getAttribute('data-copy');
+      if (textToCopy && navigator.clipboard) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showToast('Kalıp panoya kopyalandı!', '📋');
+        }).catch(() => {
+          showToast('Kopyalanamadı, izin verin.', '⚠️');
+        });
+      }
     }
   });
+
+  // Initial render
+  renderFluency('all');
 }
 
 /* ==========================================================================
-   6. 50 GRAMMAR RULES & FLASHCARD MODULE
+   8. 50 GRAMMAR RULES MODULE & FLASHCARD VIEW
    ========================================================================== */
+const GRAMMAR_STORAGE_KEY = 'yigit_grammar_mastered';
+const GRAMMAR_VIEW_MODE_KEY = 'yigit_grammar_flashcard_mode';
+
 function initGrammarRules() {
   const container = document.getElementById('grammar-list-container');
-  const toggleFlashcardBtn = document.getElementById('btn-toggle-flashcard-mode');
-  const txtFlashcardMode = document.getElementById('txt-flashcard-mode');
+  const flashcardWrapper = document.getElementById('grammar-flashcard-view');
+  const btnToggleFlashcard = document.getElementById('btn-toggle-flashcard-mode');
+  const btnReset = document.getElementById('btn-reset-grammar');
+  const searchInput = document.getElementById('grammar-search-input');
   const categoryChips = document.querySelectorAll('#grammar-category-filters .chip');
   const progressText = document.getElementById('grammar-progress-text');
-  const resetBtn = document.getElementById('btn-reset-grammar-progress');
+  const progressFill = document.getElementById('grammar-progress-fill');
+
+  // Flashcard elements
+  const flashcardCard = document.getElementById('active-flashcard');
+  const flashcardFront = document.getElementById('flashcard-front');
+  const flashcardBack = document.getElementById('flashcard-back');
+  const btnPrevFlashcard = document.getElementById('btn-prev-flashcard');
+  const btnFlipFlashcard = document.getElementById('btn-flip-flashcard');
+  const btnNextFlashcard = document.getElementById('btn-next-flashcard');
 
   if (!container || typeof GRAMMAR_POINTS === 'undefined') return;
 
-  let isFlashcardMode = localStorage.getItem('yigit_flashcard_mode') === 'true';
   let activeCategory = 'all';
-  if (txtFlashcardMode && isFlashcardMode) {
-    txtFlashcardMode.textContent = 'Liste Görünümüne Geç';
-    if (toggleFlashcardBtn) {
-      toggleFlashcardBtn.classList.add('btn-primary');
-      toggleFlashcardBtn.classList.remove('btn-outline');
-    }
-  }
+  let searchTerm = '';
+  let isFlashcardMode = localStorage.getItem(GRAMMAR_VIEW_MODE_KEY) === 'true';
+  let activeFlashcardIdx = 0;
 
   function getMasteredSet() {
     try {
-      return new Set(JSON.parse(localStorage.getItem('yigit_grammar_mastered') || '[]'));
+      return new Set(JSON.parse(localStorage.getItem(GRAMMAR_STORAGE_KEY) || '[]'));
     } catch {
       return new Set();
     }
   }
 
   function saveMasteredSet(set) {
-    localStorage.setItem('yigit_grammar_mastered', JSON.stringify(Array.from(set)));
-    updateProgress();
+    localStorage.setItem(GRAMMAR_STORAGE_KEY, JSON.stringify(Array.from(set)));
+    updateProgressBar();
   }
 
-  function updateProgress() {
-    const set = getMasteredSet();
-    const count = set.size;
+  function updateProgressBar() {
+    const mastered = getMasteredSet();
+    const count = mastered.size;
     const total = GRAMMAR_POINTS.length;
     const pct = Math.round((count / total) * 100);
-    if (progressText) {
-      progressText.textContent = `${count} / ${total} Öğrenildi (%${pct})`;
-    }
+
+    if (progressText) progressText.textContent = `${count} / ${total} Kural Öğrenildi (%${pct})`;
+    if (progressFill) progressFill.style.width = `${pct}%`;
   }
 
-  function renderGrammar() {
-    const mastered = getMasteredSet();
-    const filtered = GRAMMAR_POINTS.filter(item => {
-      if (activeCategory === 'all') return true;
-      return (item.category && item.category.toLowerCase().includes(activeCategory.toLowerCase())) ||
-             (item.title && item.title.toLowerCase().includes(activeCategory.toLowerCase()));
-    });
+  function getFilteredRules() {
+    return GRAMMAR_POINTS.filter(item => {
+      // Category match
+      let matchCat = true;
+      if (activeCategory !== 'all') {
+        const itemCat = (item.category || '').toLowerCase();
+        matchCat = itemCat.includes(activeCategory.toLowerCase());
+      }
 
-    if (filtered.length === 0) {
-      container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">Bu kategoride kural bulunamadı.</div>';
+      // Search match
+      let matchSearch = true;
+      if (searchTerm) {
+        const norm = (s) => (s || '').toLowerCase();
+        const q = searchTerm.toLowerCase();
+        const hay = norm(item.title) + ' ' + norm(item.rule) + ' ' + norm(item.tip) + ' ' +
+                    (item.correct || []).join(' ').toLowerCase() + ' ' +
+                    (item.incorrect || []).join(' ').toLowerCase();
+        matchSearch = hay.includes(q);
+      }
+
+      return matchCat && matchSearch;
+    });
+  }
+
+  function renderList() {
+    const list = getFilteredRules();
+    const mastered = getMasteredSet();
+
+    if (list.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+          <span style="font-size: 36px; display: block; margin-bottom: 8px;">🔍</span>
+          <strong style="font-size: 15px; color: var(--text-main);">Aramanızla eşleşen gramer kuralı bulunamadı.</strong>
+          <p style="font-size: 13px; margin-top: 4px;">Filtreleri sıfırlamayı veya farklı bir arama kelimesi denemeyi düşünün.</p>
+        </div>
+      `;
       return;
     }
 
-    if (!isFlashcardMode) {
-      // Standard List / Card Grid View
-      container.className = 'grid-2';
-      container.innerHTML = filtered.map(item => {
-        const isChecked = mastered.has(item.id);
-        return `
-          <div class="card" id="grammar-card-${item.id}" style="display: flex; flex-direction: column; justify-content: space-between; margin-bottom: 0;">
-            <div>
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                <span class="badge badge-primary">Kural ${item.id}</span>
-                <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
-                  <input type="checkbox" class="grammar-check" data-id="${item.id}" ${isChecked ? 'checked' : ''} style="accent-color: var(--brand-blue);">
-                  <span style="font-weight: 600; color: ${isChecked ? 'var(--brand-blue)' : 'var(--text-muted)'};">Öğrendim</span>
-                </label>
-              </div>
-              <h4 style="font-size: 15px; font-weight: 800; margin-bottom: 6px;">${item.title}</h4>
-              <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">${item.rule}</p>
-
-              <div class="example-pair">
-                <div class="wrong-box">
-                  <div class="label">❌ Hatalı Sınav Kullanımı</div>
-                  <div style="color: #991b1b;">${item.incorrect ? item.incorrect.join('<br>') : '-'}</div>
-                </div>
-                <div class="right-box">
-                  <div class="label">✅ Doğru Kullanım (Band 8)</div>
-                  <div style="color: #065f46; font-weight: 600;">${item.correct ? item.correct.join('<br>') : '-'}</div>
-                </div>
-              </div>
+    container.innerHTML = list.map(item => {
+      const isMastered = mastered.has(item.id);
+      return `
+        <div class="grammar-card ${isMastered ? 'mastered' : ''}" id="grammar-card-${item.id}">
+          <div class="grammar-card-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="badge badge-primary">Kural ${item.id}</span>
+              <span class="badge badge-neutral">${item.category || 'Gramer'}</span>
             </div>
-
-            <div class="teacher-note" style="margin-top: 12px;">
-              <span class="avatar">👨‍🏫</span>
-              <div class="teacher-note-text"><strong>Öğretmen Uyarısı:</strong> ${item.tip || 'Sınavda dikkatli ol!'}</div>
-            </div>
+            <label class="checkbox-label" title="Bu kuralı öğrendim olarak işaretle">
+              <input type="checkbox" class="grammar-check-input" data-id="${item.id}" ${isMastered ? 'checked' : ''} style="display: none;">
+              <span class="checkbox-custom">${isMastered ? '✓' : ''}</span>
+              <span>Öğrenildi</span>
+            </label>
           </div>
-        `;
-      }).join('');
-    } else {
-      // 3D Interactive Flashcard View
-      container.className = 'grid-2';
-      container.innerHTML = filtered.map(item => {
-        const isChecked = mastered.has(item.id);
-        return `
-          <div class="flashcard-container" data-id="${item.id}">
-            <div class="flashcard-inner">
-              <!-- FRONT -->
-              <div class="flashcard-front">
-                <div>
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <span class="badge badge-purple">Flashcard #${item.id}</span>
-                    <span style="font-size: 11px; color: var(--text-muted);">Kartı Çevirmek İçin Tıkla 🔄</span>
-                  </div>
-                  <h3 style="font-size: 16px; font-weight: 800; color: var(--brand-blue); margin-bottom: 8px;">${item.title}</h3>
-                  <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">${item.rule}</p>
-                  
-                  <div class="wrong-box" style="margin-top: 10px;">
-                    <div class="label">⚠️ Hatalı Cümle (Bunu Düzeltmeye Çalış):</div>
-                    <div style="font-weight: 600; color: #991b1b; font-size: 13.5px;">${item.incorrect ? item.incorrect[0] : '-'}</div>
-                  </div>
-                </div>
-                <div style="font-size: 11.5px; color: var(--text-muted); text-align: center; margin-top: auto;">
-                  Cevabı ve öğretmen notunu görmek için karta tıkla ➔
+
+          <h3 class="grammar-title">${item.title}</h3>
+          <p class="grammar-rule-text">${item.rule}</p>
+
+          <div class="grammar-examples">
+            ${(item.incorrect || []).map(inc => `
+              <div class="example-box example-incorrect">
+                <span style="font-weight: 800; font-size: 15px; flex-shrink: 0;">✕</span>
+                <div style="flex: 1;">
+                  <strong>Yanlış (Sınav Tuzağı):</strong> <em>"${inc}"</em>
                 </div>
               </div>
+            `).join('')}
 
-              <!-- BACK -->
-              <div class="flashcard-back">
-                <div>
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span class="badge badge-success">Çözüm & Doğru Cümle</span>
-                    <button class="btn-speak" data-speak="${item.correct ? item.correct[0] : ''}">🔊 Dinle</button>
-                  </div>
-                  
-                  <div class="right-box" style="margin-bottom: 12px;">
-                    <div class="label">✅ Doğru Sınav Cümlesi:</div>
-                    <div style="font-size: 14px; font-weight: 700; color: #065f46;">${item.correct ? item.correct[0] : '-'}</div>
-                  </div>
-
-                  <div class="teacher-note" style="margin-top: 8px;">
-                    <span class="avatar">👨‍🏫</span>
-                    <div class="teacher-note-text" style="font-size: 12.5px;">${item.tip || ''}</div>
-                  </div>
+            ${(item.correct || []).map(cor => `
+              <div class="example-box example-correct">
+                <span style="font-weight: 800; font-size: 15px; flex-shrink: 0;">✓</span>
+                <div style="flex: 1;">
+                  <strong>Doğru (Band 8+):</strong> <em>"${cor}"</em>
                 </div>
+                <button class="btn-speak" data-speak="${cor}" title="Doğru telaffuzu dinle">🔊 Dinle</button>
+              </div>
+            `).join('')}
+          </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px;">
-                  <span style="font-size: 11px; color: var(--text-muted);">Kartı geri çevir 🔄</span>
-                  <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
-                    <input type="checkbox" class="grammar-check" data-id="${item.id}" ${isChecked ? 'checked' : ''} style="accent-color: var(--brand-blue);">
-                    <span style="font-weight: 600;">Öğrendim</span>
-                  </label>
-                </div>
+          ${item.tip ? `
+            <div class="teacher-note">
+              <span class="teacher-avatar">👨‍🏫</span>
+              <div class="teacher-note-text">
+                <strong>Öğretmen İpucu:</strong> ${item.tip}
               </div>
             </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    attachGrammarEvents();
-    updateProgress();
+          ` : ''}
+        </div>
+      `;
+    }).join('');
   }
 
-  function attachGrammarEvents() {
-    document.querySelectorAll('.grammar-check').forEach(cb => {
-      cb.addEventListener('change', (e) => {
-        e.stopPropagation();
-        const id = parseInt(cb.getAttribute('data-id'), 10);
-        const set = getMasteredSet();
-        if (cb.checked) {
-          set.add(id);
-          showToast(`Kural ${id} "Öğrenildi" olarak işaretlendi! 🎉`, '✅');
-        } else {
-          set.delete(id);
-        }
-        saveMasteredSet(set);
-        renderGrammar();
-      });
-    });
+  function renderFlashcard() {
+    const list = getFilteredRules();
+    if (list.length === 0) {
+      if (flashcardFront) flashcardFront.innerHTML = '<p>Seçili filtrede kural yok.</p>';
+      return;
+    }
+
+    if (activeFlashcardIdx >= list.length) activeFlashcardIdx = 0;
+    if (activeFlashcardIdx < 0) activeFlashcardIdx = list.length - 1;
+
+    const current = list[activeFlashcardIdx];
+    if (flashcardCard) flashcardCard.classList.remove('flipped');
+
+    if (flashcardFront) {
+      flashcardFront.innerHTML = `
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span class="badge badge-primary">Kural ${current.id} / ${list.length}</span>
+            <span class="badge badge-neutral">${current.category || 'Gramer'}</span>
+          </div>
+          <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 14px; color: var(--text-main);">${current.title}</h3>
+          <p style="font-size: 14px; color: var(--text-muted); line-height: 1.6;">${current.rule}</p>
+        </div>
+        <div style="text-align: center; color: var(--brand-blue); font-size: 13px; font-weight: 700;">
+          💡 Örnekleri ve Öğretmen İpucunu görmek için tıkla / çevir
+        </div>
+      `;
+    }
+
+    if (flashcardBack) {
+      flashcardBack.innerHTML = `
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="badge badge-success">Doğru & Yanlış Kullanım</span>
+            <button class="btn-speak" data-speak="${(current.correct || [])[0] || ''}">🔊 Doğruyu Dinle</button>
+          </div>
+          
+          <div style="margin-bottom: 8px;">
+            <div style="font-size: 12.5px; color: var(--danger); font-weight: 700;">✕ Sınavda Yanlış:</div>
+            <div style="font-size: 13px; background: var(--danger-soft); color: var(--danger); padding: 8px 12px; border-radius: 6px; margin-top: 4px;">
+              "${(current.incorrect || [])[0] || ''}"
+            </div>
+          </div>
+
+          <div style="margin-bottom: 10px;">
+            <div style="font-size: 12.5px; color: var(--success); font-weight: 700;">✓ Doğru Band 8+ Yapı:</div>
+            <div style="font-size: 13px; background: var(--success-soft); color: var(--success); padding: 8px 12px; border-radius: 6px; margin-top: 4px;">
+              "${(current.correct || [])[0] || ''}"
+            </div>
+          </div>
+
+          ${current.tip ? `
+            <div style="font-size: 12.5px; color: var(--text-muted); background: var(--bg-subtle); padding: 8px 12px; border-radius: 6px;">
+              👨‍🏫 <strong>Yiğit'e Not:</strong> ${current.tip}
+            </div>
+          ` : ''}
+        </div>
+        <div style="text-align: center; color: var(--text-light); font-size: 12px;">
+          🔄 Ön yüze dönmek için tıkla
+        </div>
+      `;
+    }
+  }
+
+  function toggleMode(flashcard) {
+    isFlashcardMode = flashcard;
+    localStorage.setItem(GRAMMAR_VIEW_MODE_KEY, String(flashcard));
 
     if (isFlashcardMode) {
-      document.querySelectorAll('.flashcard-container').forEach(card => {
-        card.addEventListener('click', (e) => {
-          if (e.target.closest('.grammar-check') || e.target.closest('.btn-speak')) return;
-          const inner = card.querySelector('.flashcard-inner');
-          if (inner) inner.classList.toggle('flipped');
-        });
-      });
+      if (btnToggleFlashcard) btnToggleFlashcard.textContent = '📋 Liste Görünümü';
+      if (flashcardWrapper) flashcardWrapper.style.display = 'block';
+      if (container) container.style.display = 'none';
+      renderFlashcard();
+    } else {
+      if (btnToggleFlashcard) btnToggleFlashcard.textContent = '🎴 Flashcard Modu';
+      if (flashcardWrapper) flashcardWrapper.style.display = 'none';
+      if (container) container.style.display = 'block';
+      renderList();
     }
   }
 
-  if (toggleFlashcardBtn) {
-    toggleFlashcardBtn.addEventListener('click', () => {
-      isFlashcardMode = !isFlashcardMode;
-      localStorage.setItem('yigit_flashcard_mode', isFlashcardMode);
-      txtFlashcardMode.textContent = isFlashcardMode ? 'Liste Görünümüne Geç' : 'Flashcard Moduna Geç';
-      toggleFlashcardBtn.classList.toggle('btn-primary', isFlashcardMode);
-      toggleFlashcardBtn.classList.toggle('btn-outline', !isFlashcardMode);
-      renderGrammar();
+  // Checkbox state toggle
+  container.addEventListener('change', (e) => {
+    if (e.target.classList.contains('grammar-check-input')) {
+      const id = parseInt(e.target.getAttribute('data-id'), 10);
+      const mastered = getMasteredSet();
+      const card = document.getElementById(`grammar-card-${id}`);
+
+      if (e.target.checked) {
+        mastered.add(id);
+        if (card) card.classList.add('mastered');
+      } else {
+        mastered.delete(id);
+        if (card) card.classList.remove('mastered');
+      }
+
+      saveMasteredSet(mastered);
+      renderList();
+    }
+  });
+
+  // Search input
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      searchTerm = e.target.value.trim();
+      if (isFlashcardMode) renderFlashcard();
+      else renderList();
     });
   }
 
+  // Category chips
   categoryChips.forEach(chip => {
     chip.addEventListener('click', () => {
       categoryChips.forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      activeCategory = chip.getAttribute('data-cat');
-      renderGrammar();
+      activeCategory = chip.getAttribute('data-category');
+      activeFlashcardIdx = 0;
+      if (isFlashcardMode) renderFlashcard();
+      else renderList();
     });
   });
 
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      if (confirm('Tüm gramer ilerlemeni sıfırlamak istediğine emin misin?')) {
-        saveMasteredSet(new Set());
-        renderGrammar();
-        showToast('İlerleme sıfırlandı.', '🔄');
+  // Flashcard controls
+  if (btnToggleFlashcard) {
+    btnToggleFlashcard.addEventListener('click', () => {
+      toggleMode(!isFlashcardMode);
+    });
+  }
+
+  if (flashcardCard) {
+    flashcardCard.addEventListener('click', () => {
+      flashcardCard.classList.toggle('flipped');
+    });
+  }
+
+  if (btnFlipFlashcard) {
+    btnFlipFlashcard.addEventListener('click', () => {
+      if (flashcardCard) flashcardCard.classList.toggle('flipped');
+    });
+  }
+
+  if (btnPrevFlashcard) {
+    btnPrevFlashcard.addEventListener('click', () => {
+      activeFlashcardIdx--;
+      renderFlashcard();
+    });
+  }
+
+  if (btnNextFlashcard) {
+    btnNextFlashcard.addEventListener('click', () => {
+      activeFlashcardIdx++;
+      renderFlashcard();
+    });
+  }
+
+  // Reset mastered progress
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      if (confirm('Tüm gramer ilerlemen sıfırlansın mı?')) {
+        localStorage.removeItem(GRAMMAR_STORAGE_KEY);
+        updateProgressBar();
+        renderList();
+        showToast('Gramer ilerlemesi sıfırlandı.', '🔄');
       }
     });
   }
 
-  renderGrammar();
+  // Initial state setup
+  updateProgressBar();
+  toggleMode(isFlashcardMode);
 }
 
 /* ==========================================================================
-   7. 107 IDIOMS DICTIONARY & RANDOM GENERATOR
+   9. 107 IDIOMS DICTIONARY MODULE
    ========================================================================== */
-function initIdioms() {
-  const container = document.getElementById('idioms-container');
-  const chips = document.querySelectorAll('#idiom-filters .chip');
-  const randomBtn = document.getElementById('btn-random-idiom');
+const FAVORITES_STORAGE_KEY = 'yigit_favorite_idioms';
 
-  const modal = document.getElementById('idiom-modal');
-  const btnCloseModal = document.getElementById('btn-close-modal');
-  const modalTitle = document.getElementById('modal-idiom-title');
-  const modalMeaning = document.getElementById('modal-idiom-meaning');
-  const modalExample = document.getElementById('modal-idiom-example');
-  const modalNote = document.getElementById('modal-idiom-note');
-  const btnModalSpeak = document.getElementById('btn-modal-speak');
-  const btnModalNext = document.getElementById('btn-modal-next');
+function initIdioms() {
+  const container = document.getElementById('idioms-list-container');
+  const searchInput = document.getElementById('idioms-search-input');
+  const setSelect = document.getElementById('idioms-set-select');
+  const partChips = document.querySelectorAll('#idioms-part-filters .chip');
+  const favCountSpan = document.getElementById('fav-count');
+  const idiomsCountBadge = document.getElementById('idioms-count-badge');
 
   if (!container || typeof IDIOMS_DATA === 'undefined') return;
 
-  let activeCategory = 'all';
-  let currentModalIdiom = null;
+  let activePart = 'all';
+  let activeSet = 'all';
+  let searchTerm = '';
+
+  function getFavorites() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(FAVORITES_STORAGE_KEY) || '[]'));
+    } catch {
+      return new Set();
+    }
+  }
+
+  function saveFavorites(set) {
+    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(set)));
+    updateFavBadge();
+  }
+
+  function updateFavBadge() {
+    const favs = getFavorites();
+    if (favCountSpan) favCountSpan.textContent = favs.size;
+  }
+
+  function getFilteredIdioms() {
+    const favs = getFavorites();
+    return IDIOMS_DATA.filter(item => {
+      // Favorites filter
+      if (activePart === 'favorites') {
+        if (!favs.has(item.id)) return false;
+      } else if (activePart !== 'all') {
+        if (item.part !== activePart) return false;
+      }
+
+      // Set filter
+      if (activeSet !== 'all') {
+        if (item.set !== activeSet) return false;
+      }
+
+      // Search match
+      if (searchTerm) {
+        const norm = (s) => (s || '').toLowerCase();
+        const q = searchTerm.toLowerCase();
+        const hay = norm(item.phrase) + ' ' + norm(item.meaning) + ' ' + norm(item.example) + ' ' + norm(item.tip);
+        if (!hay.includes(q)) return false;
+      }
+
+      return true;
+    });
+  }
 
   function renderIdioms() {
-    const filtered = IDIOMS_DATA.filter(item => {
-      if (activeCategory === 'all') return true;
-      return (item.meaning && item.meaning.toLowerCase().includes(activeCategory.toLowerCase())) ||
-             (item.context && item.context.toLowerCase().includes(activeCategory.toLowerCase())) ||
-             (item.teacher_note && item.teacher_note.toLowerCase().includes(activeCategory.toLowerCase()));
-    });
+    const list = getFilteredIdioms();
+    const favs = getFavorites();
 
-    if (filtered.length === 0) {
-      container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">Bu kategoride deyim bulunamadı.</div>';
+    if (idiomsCountBadge) idiomsCountBadge.textContent = `${list.length} Deyim Listeleniyor`;
+
+    if (list.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+          <span style="font-size: 36px; display: block; margin-bottom: 8px;">📖</span>
+          <strong style="font-size: 15px; color: var(--text-main);">Eşleşen deyim bulunamadı.</strong>
+          <p style="font-size: 13px; margin-top: 4px;">Farklı bir arama kelimesi veya set seçin.</p>
+        </div>
+      `;
       return;
     }
 
-    container.innerHTML = filtered.map(item => {
-      const phrase = item.phrase || item.idiom || '';
-      const example = item.example || item.sample_sentence || '';
-      const tip = item.tip || item.teacher_note || 'Sınavda yerinde ve doğal kullan.';
-      const part = item.part || item.context || 'Part 1 / 2 / 3';
+    container.innerHTML = list.map(item => {
+      const isFav = favs.has(item.id);
       return `
         <div class="idiom-card" id="idiom-card-${item.id}">
-          <div>
-            <div class="idiom-header">
-              <span class="badge badge-purple">${part}</span>
-              <button class="btn-speak" data-speak="${phrase}. ${example}" title="Sesli Telaffuz">🔊 Telaffuz</button>
+          <div class="idiom-header">
+            <div>
+              <span class="badge badge-purple" style="margin-bottom: 6px;">${item.set || 'Deyim'}</span>
+              <span class="badge badge-primary">${item.part || 'IELTS'}</span>
+              <h3 class="idiom-phrase" style="margin-top: 4px;">"${item.phrase}"</h3>
             </div>
-            <div class="idiom-name">${phrase}</div>
-            <div class="idiom-meaning"><strong>Anlamı:</strong> ${item.meaning}</div>
-
-            ${example ? `
-              <div style="background: var(--bg-subtle); padding: 8px 12px; border-radius: 6px; font-size: 12.5px; font-style: italic; margin-bottom: 8px; border-left: 3px solid var(--brand-blue);">
-                "${example}"
-              </div>
-            ` : ''}
+            <button class="btn-star-idiom ${isFav ? 'starred' : ''}" data-id="${item.id}" title="${isFav ? 'Favorilerden çıkar' : 'Favorilere ekle'}">
+              ${isFav ? '★' : '☆'}
+            </button>
           </div>
 
-          <div class="teacher-note" style="margin-top: 10px; font-size: 12px; padding: 8px 12px;">
-            <span class="avatar" style="font-size: 15px;">👨‍🏫</span>
-            <div class="teacher-note-text">${tip}</div>
+          <div class="idiom-meaning">
+            <strong>Türkçe Anlamı:</strong> ${item.meaning}
+          </div>
+
+          <div class="idiom-example-box">
+            <strong>Örnek Cümle:</strong> <em>"${item.example}"</em>
+          </div>
+
+          <div class="idiom-footer">
+            <span style="font-size: 12px; color: var(--text-muted);">
+              👨‍🏫 <strong>İpucu:</strong> ${item.tip}
+            </span>
+            <button class="btn-speak" data-speak="${item.phrase}. ${item.example}" title="Deyimi ve cümleyi dinle">
+              🔊 Dinle
+            </button>
           </div>
         </div>
       `;
     }).join('');
   }
 
-  chips.forEach(chip => {
+  // Favorite toggle listener
+  container.addEventListener('click', (e) => {
+    const starBtn = e.target.closest('.btn-star-idiom');
+    if (starBtn) {
+      const id = parseInt(starBtn.getAttribute('data-id'), 10);
+      const favs = getFavorites();
+      if (favs.has(id)) {
+        favs.delete(id);
+        starBtn.classList.remove('starred');
+        starBtn.textContent = '☆';
+        showToast('Favorilerden çıkarıldı.', '⭐');
+      } else {
+        favs.add(id);
+        starBtn.classList.add('starred');
+        starBtn.textContent = '★';
+        showToast('Deyim favorilere eklendi!', '⭐');
+      }
+      saveFavorites(favs);
+      if (activePart === 'favorites') renderIdioms();
+    }
+  });
+
+  // Search input
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      searchTerm = e.target.value.trim();
+      renderIdioms();
+    });
+  }
+
+  // Set dropdown
+  if (setSelect) {
+    setSelect.addEventListener('change', (e) => {
+      activeSet = e.target.value;
+      renderIdioms();
+    });
+  }
+
+  // Part filter chips
+  partChips.forEach(chip => {
     chip.addEventListener('click', () => {
-      chips.forEach(c => c.classList.remove('active'));
+      partChips.forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      activeCategory = chip.getAttribute('data-cat');
+      activePart = chip.getAttribute('data-part');
       renderIdioms();
     });
   });
 
-  function showRandomIdiom() {
-    const randomIndex = Math.floor(Math.random() * IDIOMS_DATA.length);
-    currentModalIdiom = IDIOMS_DATA[randomIndex];
-
-    const phrase = currentModalIdiom.phrase || currentModalIdiom.idiom || '';
-    const example = currentModalIdiom.example || currentModalIdiom.sample_sentence || 'Örnek cümle bulunmuyor.';
-    const tip = currentModalIdiom.tip || currentModalIdiom.teacher_note || 'Bu deyim Band 8 için harika bir tercihtir!';
-    if (modalTitle) modalTitle.textContent = phrase;
-    if (modalMeaning) modalMeaning.textContent = currentModalIdiom.meaning;
-    if (modalExample) modalExample.textContent = example;
-    if (modalNote) modalNote.textContent = tip;
-
-    if (modal) modal.style.display = 'flex';
-  }
-
-  if (randomBtn) randomBtn.addEventListener('click', showRandomIdiom);
-  if (btnModalNext) btnModalNext.addEventListener('click', showRandomIdiom);
-
-  if (btnModalSpeak) {
-    btnModalSpeak.addEventListener('click', () => {
-      if (currentModalIdiom) {
-        const p = currentModalIdiom.phrase || currentModalIdiom.idiom || '';
-        const ex = currentModalIdiom.example || currentModalIdiom.sample_sentence || '';
-        speakText(`${p}. ${ex}`);
-      }
-    });
-  }
-
-  if (btnCloseModal) {
-    btnCloseModal.addEventListener('click', () => {
-      if (modal) modal.style.display = 'none';
-    });
-  }
-
-  if (modal) {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.style.display = 'none';
-    });
-  }
-
+  // Initial render
+  updateFavBadge();
   renderIdioms();
 }
 
 /* ==========================================================================
-   8. SIMULATOR & VOICE RECORDER STUDIO
+   10. EXAM SIMULATOR & VOICE RECORDING STUDIO (MEDIARECORDER API)
    ========================================================================== */
 function initSimulator() {
-  const btnPart1 = document.getElementById('sim-mode-part1');
-  const btnPart2 = document.getElementById('sim-mode-part2');
-  const btnPart3 = document.getElementById('sim-mode-part3');
+  const btnMode1 = document.getElementById('sim-mode-part1');
+  const btnMode2 = document.getElementById('sim-mode-part2');
+  const btnMode3 = document.getElementById('sim-mode-part3');
   const badgePart = document.getElementById('sim-part-badge');
-  const promptBox = document.getElementById('sim-prompt-content');
-  const btnNext = document.getElementById('btn-next-prompt');
+  const promptContainer = document.getElementById('sim-prompt-content');
+  const btnNextPrompt = document.getElementById('btn-next-prompt');
 
+  // Part 2 Timers
   const part2Timers = document.getElementById('part2-timer-section');
   const prepDisplay = document.getElementById('timer-prep-display');
   const speechDisplay = document.getElementById('timer-speech-display');
   const btnStartPrep = document.getElementById('btn-start-prep');
+  const btnResetPrep = document.getElementById('btn-reset-prep');
   const btnStartSpeech = document.getElementById('btn-start-speech');
+  const btnResetSpeech = document.getElementById('btn-reset-speech');
 
-  // Recorder Elements
+  // Voice Recorder
+  const cardRecorder = document.getElementById('voice-recorder-card');
+  const recDot = document.getElementById('rec-dot');
+  const recText = document.getElementById('rec-text');
+  const recTimerDisplay = document.getElementById('rec-duration-display');
   const btnRecordStart = document.getElementById('btn-record-start');
   const btnRecordStop = document.getElementById('btn-record-stop');
-  const recIndicator = document.getElementById('rec-status-indicator');
-  const recStatusText = document.getElementById('rec-status-text');
-  const recTimerDisplay = document.getElementById('rec-timer-display');
-  const audioPlaybackContainer = document.getElementById('audio-playback-container');
-  const audioPlayer = document.getElementById('audio-player');
-  const btnDownload = document.getElementById('btn-download-recording');
+  const playbackSection = document.getElementById('rec-playback-section');
+  const audioPlayer = document.getElementById('rec-audio-player');
+  const btnDownloadRec = document.getElementById('btn-download-recording');
+  const btnClearRec = document.getElementById('btn-clear-recording');
+  const sessionHistoryDiv = document.getElementById('session-recordings-history');
+  const historyList = document.getElementById('recordings-history-list');
 
-  let currentMode = localStorage.getItem('yigit_sim_mode') || 'part1';
-  let p1Index = 0;
-  let p2Index = 0;
-  let p3Index = 0;
+  let currentMode = 'part1'; // 'part1' | 'part2' | 'part3'
+  let part1Index = 0;
+  let part2Index = 0;
+  let part3Index = 0;
 
-  let prepInterval = null;
-  let speechInterval = null;
+  // Timers state
+  let prepTimerInterval = null;
+  let prepSecondsRemaining = 60;
+  let speechTimerInterval = null;
+  let speechSecondsRemaining = 120;
 
+  // MediaRecorder state
   let mediaRecorder = null;
   let audioChunks = [];
-  let recInterval = null;
-  let recSeconds = 0;
+  let recordingInterval = null;
+  let recordingElapsedSecs = 0;
+  let currentRecordingBlobUrl = null;
 
-  function loadPrompt() {
-    if (!badgePart || !promptBox) return;
-
+  function renderCurrentPrompt() {
     if (currentMode === 'part1') {
-      badgePart.textContent = 'Part 1 (4 - 5 Dk)';
-      badgePart.className = 'badge badge-primary';
+      if (badgePart) badgePart.textContent = 'Part 1: Tanışma ve Genel Sorular';
       if (part2Timers) part2Timers.style.display = 'none';
 
-      if (typeof PART1_QUESTIONS !== 'undefined' && PART1_QUESTIONS.length > 0) {
-        const item = PART1_QUESTIONS[p1Index % PART1_QUESTIONS.length];
-        promptBox.innerHTML = `
-          <div style="font-size: 13px; color: var(--brand-blue); text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Konu: ${item.topic}</div>
-          <div style="font-size: 17px; margin-bottom: 12px; font-weight: 700;">"${item.q}"</div>
+      if (typeof PART1_QUESTIONS === 'undefined' || PART1_QUESTIONS.length === 0) return;
+      const qGroup = PART1_QUESTIONS[part1Index % PART1_QUESTIONS.length];
+      const qList = qGroup.questions || [qGroup.title || 'Where are you from?'];
+
+      promptContainer.innerHTML = `
+        <div>
+          <span class="badge badge-purple" style="margin-bottom: 6px;">Konu: ${qGroup.topic || 'Genel'}</span>
+          <h3 class="sim-question-text">${qList[0]}</h3>
+          <div style="background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-md); margin-top: 10px;">
+            <strong style="font-size: 13px; color: var(--brand-blue); display: block; margin-bottom: 6px;">Takip Soruları:</strong>
+            <ul style="font-size: 13px; padding-left: 20px; line-height: 1.6;">
+              ${qList.slice(1).map(q => `<li>${q}</li>`).join('')}
+            </ul>
+          </div>
           <div class="teacher-note">
-            <span class="avatar">👨‍🏫</span>
+            <span class="teacher-avatar">👨‍🏫</span>
             <div class="teacher-note-text">
-              <strong>Öğretmen Tavsiyesi (Sayfa 37-38):</strong> Asla sadece 'Yes/No' deyip durma! 2-3 Cümle kuralını uygula: Doğrudan Cevap + Konum/Mesafe + Kişisel Yorum.
+              <strong>Kural 1 & 2 Uygula:</strong> Asla sadece tek kelime cevap verme! Doğrudan Cevap + Konum/Açıklama + Kişisel Yorum formülünü kullan.
             </div>
           </div>
-        `;
-      }
+        </div>
+      `;
     } else if (currentMode === 'part2') {
-      badgePart.textContent = 'Part 2 Cue Card (3 - 4 Dk)';
-      badgePart.className = 'badge badge-warning';
-      if (part2Timers) part2Timers.style.display = 'block';
+      if (badgePart) badgePart.textContent = 'Part 2: Bireysel Uzun Konuşma (Cue Card)';
+      if (part2Timers) part2Timers.style.display = 'grid';
 
-      if (typeof CUE_CARDS !== 'undefined' && CUE_CARDS.length > 0) {
-        const item = CUE_CARDS[p2Index % CUE_CARDS.length];
-        promptBox.innerHTML = `
-          <div style="font-size: 13px; color: #b45309; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Cue Card Görevi:</div>
-          <div style="font-size: 18px; margin-bottom: 12px; font-weight: 800; color: var(--text-main);">${item.title}</div>
-          <div style="font-size: 13.5px; margin-bottom: 8px;">You should say:</div>
-          <ul style="margin-left: 20px; font-size: 14px; line-height: 1.7; margin-bottom: 16px;">
-            ${(item.bullets || []).map(bp => `<li>${bp}</li>`).join('')}
+      if (typeof CUE_CARDS === 'undefined' || CUE_CARDS.length === 0) return;
+      const card = CUE_CARDS[part2Index % CUE_CARDS.length];
+
+      promptContainer.innerHTML = `
+        <div>
+          <span class="badge badge-warning" style="margin-bottom: 6px;">Cue Card #${part2Index + 1}</span>
+          <h3 class="sim-question-text">${card.topic}</h3>
+          <p style="font-size: 13.5px; color: var(--text-muted);">You should say:</p>
+          <ul class="cue-card-bullets">
+            ${(card.bulletPoints || card.bullets || []).map(b => `<li>${b}</li>`).join('')}
           </ul>
           <div class="teacher-note">
-            <span class="avatar">👨‍🏫</span>
+            <span class="teacher-avatar">👨‍🏫</span>
             <div class="teacher-note-text">
-              <strong>Öğretmen Tavsiyesi (Sayfa 39-40):</strong> ${item.tips}
+              <strong>Kural 4 (Sınav Görevlisinden Çok Konuş):</strong> 1 dakika hazırlıkta her madde için bir anahtar kelime yaz. 2 dakika boyunca duraksamadan anlat.
             </div>
           </div>
-        `;
-      }
-    } else if (currentMode === 'part3') {
-      badgePart.textContent = 'Part 3 Derinlemesine Tartışma (4 - 5 Dk)';
-      badgePart.className = 'badge badge-success';
+        </div>
+      `;
+    } else {
+      // Part 3
+      if (badgePart) badgePart.textContent = 'Part 3: İki Yönlü Soyut Tartışma';
       if (part2Timers) part2Timers.style.display = 'none';
 
-      if (typeof PART3_QUESTIONS !== 'undefined' && PART3_QUESTIONS.length > 0) {
-        const item = PART3_QUESTIONS[p3Index % PART3_QUESTIONS.length];
-        promptBox.innerHTML = `
-          <div style="font-size: 13px; color: var(--brand-blue); text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Tema: ${item.topic}</div>
-          <div style="font-size: 17px; margin-bottom: 12px; font-weight: 700;">"${item.q}"</div>
-          ${item.stalling ? `
-            <div style="background: var(--bg-card); padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; border: 1px solid var(--border);">
-              <strong>Zaman Kazanma Başlangıcı:</strong> <em>"${item.stalling}"</em>
-            </div>
-          ` : ''}
-          <div class="teacher-note" style="border-left-color: #f59e0b;">
-            <span class="avatar">⭐</span>
+      if (typeof PART3_QUESTIONS === 'undefined' || PART3_QUESTIONS.length === 0) return;
+      const p3 = PART3_QUESTIONS[part3Index % PART3_QUESTIONS.length];
+
+      promptContainer.innerHTML = `
+        <div>
+          <span class="badge badge-success" style="margin-bottom: 6px;">Tartışma Teması: ${p3.topic || 'Toplumsal Dinamikler'}</span>
+          <h3 class="sim-question-text">${p3.question || (p3.questions ? p3.questions[0] : 'What are the main consequences?')}</h3>
+          <div style="background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-md); margin-top: 10px;">
+            <strong style="font-size: 13px; color: var(--brand-blue); display: block; margin-bottom: 6px;">İpuçları & Beklenti:</strong>
+            <p style="font-size: 13px; line-height: 1.5; color: var(--text-muted);">
+              Kişisel tecrübeden ziyade toplumsal, ekonomik veya küresel açıdan iki zıt görüşü karşılaştırarak cevap ver.
+            </p>
+          </div>
+          <div class="teacher-note">
+            <span class="teacher-avatar">👨‍🏫</span>
             <div class="teacher-note-text">
-              <strong>Altın Kural (Sayfa 41):</strong> ${item.goldenRule}
+              <strong>Kural 7 (Cevabını Genişlet):</strong> 'On the one hand..., but when viewed from another angle...' kalıbını kullanarak derinlemesine analiz yap.
             </div>
           </div>
-        `;
+        </div>
+      `;
+    }
+  }
+
+  // Switch modes
+  [btnMode1, btnMode2, btnMode3].forEach(btn => {
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      [btnMode1, btnMode2, btnMode3].forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMode = btn.getAttribute('data-mode');
+      renderCurrentPrompt();
+    });
+  });
+
+  // Next prompt button
+  if (btnNextPrompt) {
+    btnNextPrompt.addEventListener('click', () => {
+      if (currentMode === 'part1') part1Index++;
+      else if (currentMode === 'part2') part2Index++;
+      else part3Index++;
+      renderCurrentPrompt();
+    });
+  }
+
+  // Timer helpers
+  function formatTime(secs) {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+  }
+
+  // Part 2 Prep Countdown (1 min)
+  if (btnStartPrep) {
+    btnStartPrep.addEventListener('click', () => {
+      if (prepTimerInterval) {
+        clearInterval(prepTimerInterval);
+        prepTimerInterval = null;
+        btnStartPrep.textContent = 'Devam Et';
+        return;
+      }
+      btnStartPrep.textContent = 'Duraklat';
+      prepTimerInterval = setInterval(() => {
+        prepSecondsRemaining--;
+        if (prepDisplay) {
+          prepDisplay.textContent = formatTime(prepSecondsRemaining);
+          if (prepSecondsRemaining <= 10) prepDisplay.classList.add('urgent');
+        }
+        if (prepSecondsRemaining <= 0) {
+          clearInterval(prepTimerInterval);
+          prepTimerInterval = null;
+          btnStartPrep.textContent = 'Bitti';
+          showToast('1 Dakikalık Hazırlık Süreniz Doldu! Konuşmaya başlayın.', '⏰');
+          // Beep audio indicator
+          playBeep();
+        }
+      }, 1000);
+    });
+  }
+
+  if (btnResetPrep) {
+    btnResetPrep.addEventListener('click', () => {
+      if (prepTimerInterval) clearInterval(prepTimerInterval);
+      prepTimerInterval = null;
+      prepSecondsRemaining = 60;
+      if (prepDisplay) {
+        prepDisplay.textContent = '01:00';
+        prepDisplay.classList.remove('urgent');
+      }
+      if (btnStartPrep) btnStartPrep.textContent = 'Başlat';
+    });
+  }
+
+  // Part 2 Speaking Countdown (2 min)
+  if (btnStartSpeech) {
+    btnStartSpeech.addEventListener('click', () => {
+      if (speechTimerInterval) {
+        clearInterval(speechTimerInterval);
+        speechTimerInterval = null;
+        btnStartSpeech.textContent = 'Devam Et';
+        return;
+      }
+      btnStartSpeech.textContent = 'Duraklat';
+      speechTimerInterval = setInterval(() => {
+        speechSecondsRemaining--;
+        if (speechDisplay) {
+          speechDisplay.textContent = formatTime(speechSecondsRemaining);
+          if (speechSecondsRemaining <= 15) speechDisplay.classList.add('urgent');
+        }
+        if (speechSecondsRemaining <= 0) {
+          clearInterval(speechTimerInterval);
+          speechTimerInterval = null;
+          btnStartSpeech.textContent = 'Bitti';
+          showToast('2 Dakikalık Konuşma Süreniz Tamamlandı! Teşekkürler.', '🛑');
+          playBeep();
+        }
+      }, 1000);
+    });
+  }
+
+  if (btnResetSpeech) {
+    btnResetSpeech.addEventListener('click', () => {
+      if (speechTimerInterval) clearInterval(speechTimerInterval);
+      speechTimerInterval = null;
+      speechSecondsRemaining = 120;
+      if (speechDisplay) {
+        speechDisplay.textContent = '02:00';
+        speechDisplay.classList.remove('urgent');
+      }
+      if (btnStartSpeech) btnStartSpeech.textContent = 'Başlat';
+    });
+  }
+
+  function playBeep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 660;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.6);
+    } catch (err) {
+      console.warn('AudioContext beep error:', err);
+    }
+  }
+
+  // ==========================================
+  // MEDIARECORDER RECORDING ENGINE
+  // ==========================================
+  async function startRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showToast('Tarayıcınız ses kaydını desteklemiyor.', '⚠️');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        if (currentRecordingBlobUrl) URL.revokeObjectURL(currentRecordingBlobUrl);
+        currentRecordingBlobUrl = URL.createObjectURL(audioBlob);
+
+        if (audioPlayer) {
+          audioPlayer.src = currentRecordingBlobUrl;
+        }
+        if (playbackSection) playbackSection.style.display = 'flex';
+
+        // Add to session history
+        addRecordingToSessionHistory(currentRecordingBlobUrl, recordingElapsedSecs);
+
+        // Stop all tracks to release mic
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+
+      // UI state
+      if (cardRecorder) cardRecorder.classList.add('recording');
+      if (recText) recText.textContent = 'Kayıt Yapılıyor...';
+      if (btnRecordStart) btnRecordStart.style.display = 'none';
+      if (btnRecordStop) btnRecordStop.style.display = 'inline-flex';
+
+      recordingElapsedSecs = 0;
+      if (recTimerDisplay) recTimerDisplay.textContent = '00:00';
+
+      recordingInterval = setInterval(() => {
+        recordingElapsedSecs++;
+        if (recTimerDisplay) recTimerDisplay.textContent = formatTime(recordingElapsedSecs);
+      }, 1000);
+
+      showToast('Kayıt başladı. Rahat ve tane tane konuşun.', '🎙️');
+    } catch (err) {
+      console.error('Mic access error:', err);
+      showToast('Mikrofon erişim izni verilmedi!', '❌');
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    if (recordingInterval) clearInterval(recordingInterval);
+    recordingInterval = null;
+
+    if (cardRecorder) cardRecorder.classList.remove('recording');
+    if (recText) recText.textContent = 'Kayıt Tamamlandı';
+    if (btnRecordStart) btnRecordStart.style.display = 'inline-flex';
+    if (btnRecordStop) btnRecordStop.style.display = 'none';
+
+    showToast('Ses kaydı kaydedildi. Aşağıdan dinleyin.', '✅');
+  }
+
+  if (btnRecordStart) btnRecordStart.addEventListener('click', startRecording);
+  if (btnRecordStop) btnRecordStop.addEventListener('click', stopRecording);
+
+  if (btnDownloadRec) {
+    btnDownloadRec.addEventListener('click', () => {
+      if (!currentRecordingBlobUrl) return;
+      const a = document.createElement('a');
+      a.href = currentRecordingBlobUrl;
+      a.download = `Yigit_IELTS_Speaking_${new Date().toISOString().slice(0, 10)}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('Ses kaydı bilgisayarınıza indirildi.', '💾');
+    });
+  }
+
+  if (btnClearRec) {
+    btnClearRec.addEventListener('click', () => {
+      if (audioPlayer) audioPlayer.src = '';
+      if (playbackSection) playbackSection.style.display = 'none';
+      if (recTimerDisplay) recTimerDisplay.textContent = '00:00';
+      if (recText) recText.textContent = 'Mikrofon Hazır';
+      showToast('Kayıt temizlendi.', '🗑️');
+    });
+  }
+
+  function addRecordingToSessionHistory(blobUrl, duration) {
+    if (!sessionHistoryDiv || !historyList) return;
+    sessionHistoryDiv.style.display = 'block';
+
+    const item = document.createElement('div');
+    item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px; background: var(--bg-subtle); border-radius: 8px; margin-top: 6px; font-size: 13px;';
+    item.innerHTML = `
+      <div>
+        <strong>Kayıt:</strong> ${new Date().toLocaleTimeString()} (${formatTime(duration)})
+      </div>
+      <div style="display: flex; gap: 6px;">
+        <audio src="${blobUrl}" controls style="height: 32px; width: 180px;"></audio>
+      </div>
+    `;
+    historyList.prepend(item);
+  }
+
+  // Initial render
+  renderCurrentPrompt();
+}
+
+/* ==========================================================================
+   11. ERROR HUNTER QUIZ MODULE
+   ========================================================================== */
+const QUIZ_STORAGE_KEY = 'yigit_quiz_answered';
+
+function initQuiz() {
+  const container = document.getElementById('quiz-container');
+  const scoreBadge = document.getElementById('quiz-score-badge');
+  const btnReset = document.getElementById('btn-reset-quiz');
+
+  if (!container || typeof QUIZ_QUESTIONS === 'undefined') return;
+
+  let answeredMap = {};
+  try {
+    answeredMap = JSON.parse(localStorage.getItem(QUIZ_STORAGE_KEY) || '{}');
+  } catch {
+    answeredMap = {};
+  }
+
+  function updateScore() {
+    const answeredKeys = Object.keys(answeredMap);
+    let correctCount = 0;
+    answeredKeys.forEach(k => {
+      if (answeredMap[k].isCorrect) correctCount++;
+    });
+    const total = QUIZ_QUESTIONS.length;
+    if (scoreBadge) {
+      scoreBadge.textContent = `Skor: ${correctCount} / ${total}`;
+      if (answeredKeys.length === total) {
+        scoreBadge.classList.add('badge-success');
       }
     }
   }
 
-  function setMode(mode) {
-    currentMode = mode;
-    localStorage.setItem('yigit_sim_mode', mode);
-    [btnPart1, btnPart2, btnPart3].forEach(b => {
-      if (b) {
-        b.classList.remove('btn-primary');
-        b.classList.add('btn-outline');
-      }
-    });
-    if (mode === 'part1' && btnPart1) btnPart1.classList.replace('btn-outline', 'btn-primary');
-    if (mode === 'part2' && btnPart2) btnPart2.classList.replace('btn-outline', 'btn-primary');
-    if (mode === 'part3' && btnPart3) btnPart3.classList.replace('btn-outline', 'btn-primary');
-    loadPrompt();
-  }
-
-  if (btnPart1) btnPart1.addEventListener('click', () => setMode('part1'));
-  if (btnPart2) btnPart2.addEventListener('click', () => setMode('part2'));
-  if (btnPart3) btnPart3.addEventListener('click', () => setMode('part3'));
-
-  if (btnNext) {
-    btnNext.addEventListener('click', () => {
-      if (currentMode === 'part1') p1Index++;
-      else if (currentMode === 'part2') p2Index++;
-      else if (currentMode === 'part3') p3Index++;
-      loadPrompt();
-    });
-  }
-
-  function playBeep(freq = 600, duration = 300) {
-    try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.frequency.value = freq;
-      osc.start();
-      setTimeout(() => {
-        osc.stop();
-        audioCtx.close();
-      }, duration);
-    } catch {}
-  }
-
-  if (btnStartPrep) {
-    btnStartPrep.addEventListener('click', () => {
-      clearInterval(prepInterval);
-      let sec = 60;
-      btnStartPrep.disabled = true;
-      btnStartPrep.textContent = 'Hazırlan...';
-
-      prepInterval = setInterval(() => {
-        sec--;
-        const m = String(Math.floor(sec / 60)).padStart(2, '0');
-        const s = String(sec % 60).padStart(2, '0');
-        if (prepDisplay) prepDisplay.textContent = `${m}:${s}`;
-
-        if (sec <= 0) {
-          clearInterval(prepInterval);
-          btnStartPrep.disabled = false;
-          btnStartPrep.textContent = 'Tekrar Başlat';
-          if (prepDisplay) prepDisplay.textContent = '00:00';
-          playBeep(880, 500);
-          showToast('1 Dakikalık Hazırlık Süren Doldu! Şimdi Konuşmaya Başla!', '⏰');
-        }
-      }, 1000);
-    });
-  }
-
-  if (btnStartSpeech) {
-    btnStartSpeech.addEventListener('click', () => {
-      clearInterval(speechInterval);
-      let sec = 120;
-      btnStartSpeech.disabled = true;
-      btnStartSpeech.textContent = 'Konuşuyorsun...';
-
-      speechInterval = setInterval(() => {
-        sec--;
-        const m = String(Math.floor(sec / 60)).padStart(2, '0');
-        const s = String(sec % 60).padStart(2, '0');
-        if (speechDisplay) speechDisplay.textContent = `${m}:${s}`;
-
-        if (sec <= 0) {
-          clearInterval(speechInterval);
-          btnStartSpeech.disabled = false;
-          btnStartSpeech.textContent = 'Tekrar Başlat';
-          if (speechDisplay) speechDisplay.textContent = '00:00';
-          playBeep(440, 600);
-          showToast('2 Dakikalık Konuşma Süresi Tamamlandı! Harika!', '🎉');
-        }
-      }, 1000);
-    });
-  }
-
-  if (btnRecordStart) {
-    btnRecordStart.addEventListener('click', async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) audioChunks.push(e.data);
-        };
-
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(audioChunks, { type: 'audio/webm' });
-          const audioUrl = URL.createObjectURL(blob);
-          if (audioPlayer) audioPlayer.src = audioUrl;
-          if (btnDownload) {
-            btnDownload.href = audioUrl;
-            btnDownload.download = `yigit_ielts_${currentMode}_kayit.webm`;
-          }
-          if (audioPlaybackContainer) audioPlaybackContainer.style.display = 'block';
-          stream.getTracks().forEach(track => track.stop());
-        };
-
-        mediaRecorder.start();
-        recSeconds = 0;
-        if (recTimerDisplay) recTimerDisplay.textContent = '00:00';
-        if (recIndicator) recIndicator.className = 'rec-indicator recording';
-        if (recStatusText) recStatusText.textContent = 'CANLI KAYITTA ●';
-        btnRecordStart.disabled = true;
-        if (btnRecordStop) btnRecordStop.disabled = false;
-
-        clearInterval(recInterval);
-        recInterval = setInterval(() => {
-          recSeconds++;
-          const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
-          const s = String(recSeconds % 60).padStart(2, '0');
-          if (recTimerDisplay) recTimerDisplay.textContent = `${m}:${s}`;
-        }, 1000);
-
-        showToast('Mikrofon kaydı başladı. Rahat ve akıcı konuş!', '🎙️');
-      } catch (err) {
-        showToast('Mikrofona erişilemedi. Tarayıcı izinlerini kontrol et.', '⚠️');
-      }
-    });
-  }
-
-  if (btnRecordStop) {
-    btnRecordStop.addEventListener('click', () => {
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-        clearInterval(recInterval);
-        if (recIndicator) recIndicator.className = 'rec-indicator';
-        if (recStatusText) recStatusText.textContent = 'Kayıt Tamamlandı';
-        if (btnRecordStart) btnRecordStart.disabled = false;
-        btnRecordStop.disabled = true;
-        showToast('Kayıt başarıyla durduruldu. Aşağıdan dinleyebilirsin!', '🎧');
-      }
-    });
-  }
-
-  setMode('part1');
-}
-
-/* ==========================================================================
-   9. ERROR HUNTER QUIZ
-   ========================================================================== */
-function initQuiz() {
-  const container = document.getElementById('quiz-container');
-  const scoreBadge = document.getElementById('quiz-score-badge');
-  const resetBtn = document.getElementById('btn-reset-quiz');
-
-  if (!container || typeof QUIZ_QUESTIONS === 'undefined') return;
-
-  let answered = JSON.parse(localStorage.getItem('yigit_quiz_answered') || '{}');
-
   function renderQuiz() {
     container.innerHTML = QUIZ_QUESTIONS.map((q, idx) => {
-      const prevAns = answered[idx];
-      let fbHtml = '';
-      if (prevAns !== undefined) {
-        const isCor = (typeof prevAns === 'object') ? prevAns.isCorrect : prevAns;
-        fbHtml = `
-          <div class="teacher-note" style="${isCor ? 'border-left-color: var(--success);' : 'border-left-color: var(--danger);'}">
-            <span class="avatar">${isCor ? '🎉' : '💡'}</span>
-            <div class="teacher-note-text">
-              <strong>${isCor ? 'Tebrikler Yiğit, Tam İsabet!' : 'Dikkat Tuzağa Düştün:'}</strong> ${q.explanation}
-            </div>
-          </div>
-        `;
-      }
+      const prevAns = answeredMap[idx];
+      const isAnswered = prevAns !== undefined;
 
       return `
-        <div class="card" style="margin-bottom: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <span class="badge badge-primary">Soru ${idx + 1} / ${QUIZ_QUESTIONS.length}</span>
-            <span style="font-size: 11px; color: var(--text-muted);">Kritik Sınav Tuzağı</span>
+        <div class="quiz-card" id="quiz-question-${idx}">
+          <div class="quiz-header">
+            <span class="quiz-question-num">Soru ${idx + 1} / ${QUIZ_QUESTIONS.length}</span>
+            ${isAnswered ? `
+              <span class="badge ${prevAns.isCorrect ? 'badge-success' : 'badge-danger'}">
+                ${prevAns.isCorrect ? '✓ Doğru' : '✕ Hatalı'}
+              </span>
+            ` : ''}
           </div>
-          <p style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">${q.question}</p>
 
-          <div class="quiz-options" data-q-idx="${idx}">
+          <div class="quiz-question-stem">${q.question}</div>
+
+          <div class="quiz-options-list">
             ${(q.options || []).map((opt, optIdx) => {
-              let optClass = 'quiz-opt';
-              if (prevAns !== undefined) {
-                const chosenOpt = (typeof prevAns === 'object') ? prevAns.optIdx : -1;
-                if (optIdx === q.correct) optClass += ' correct';
-                else if (optIdx === chosenOpt) optClass += ' wrong';
+              let optClass = '';
+              if (isAnswered) {
+                if (optIdx === q.correct) optClass = 'correct';
+                else if (optIdx === prevAns.selected) optClass = 'incorrect';
+                else optClass = 'disabled';
               }
               return `
-                <div class="${optClass}" data-opt-idx="${optIdx}">
-                  <span style="font-weight: 700; width: 22px;">${String.fromCharCode(65 + optIdx)})</span>
+                <button class="quiz-opt-btn ${optClass}" data-q="${idx}" data-opt="${optIdx}" ${isAnswered ? 'disabled' : ''}>
+                  <span style="font-family: var(--font-mono); font-weight: 800;">${String.fromCharCode(65 + optIdx)})</span>
                   <span>${opt}</span>
-                </div>
+                </button>
               `;
             }).join('')}
           </div>
 
-          <div class="quiz-feedback" id="quiz-feedback-${idx}" style="${fbHtml ? 'display: block;' : 'display: none;'} margin-top: 14px;">
-            ${fbHtml}
-          </div>
+          ${isAnswered ? `
+            <div class="quiz-explanation-box">
+              <strong style="color: ${prevAns.isCorrect ? 'var(--success)' : 'var(--danger)'};">
+                ${prevAns.isCorrect ? '🎉 Harika, Tam İsabet!' : '💡 Dikkat, Sınav Tuzağı:'}
+              </strong>
+              <p style="margin-top: 4px; color: var(--text-main);">${q.explanation}</p>
+            </div>
+          ` : ''}
         </div>
       `;
     }).join('');
 
-    container.querySelectorAll('.quiz-opt').forEach(optEl => {
-      optEl.addEventListener('click', () => {
-        const parent = optEl.closest('.quiz-options');
-        const qIdx = parseInt(parent.getAttribute('data-q-idx'), 10);
-        if (answered[qIdx] !== undefined) return;
-
-        const optIdx = parseInt(optEl.getAttribute('data-opt-idx'), 10);
-        const qData = QUIZ_QUESTIONS[qIdx];
-        const isCorrect = (optIdx === qData.correct);
-
-        answered[qIdx] = { isCorrect, optIdx };
-        localStorage.setItem('yigit_quiz_answered', JSON.stringify(answered));
-
-        parent.querySelectorAll('.quiz-opt').forEach((o, i) => {
-          if (i === qData.correct) o.classList.add('correct');
-          else if (i === optIdx && !isCorrect) o.classList.add('wrong');
-        });
-
-        const fbBox = document.getElementById(`quiz-feedback-${qIdx}`);
-        if (fbBox) {
-          fbBox.style.display = 'block';
-          fbBox.innerHTML = `
-            <div class="teacher-note" style="${isCorrect ? 'border-left-color: var(--success);' : 'border-left-color: var(--danger);'}">
-              <span class="avatar">${isCorrect ? '🎉' : '💡'}</span>
-              <div class="teacher-note-text">
-                <strong>${isCorrect ? 'Tebrikler Yiğit, Tam İsabet!' : 'Dikkat Tuzağa Düştün:'}</strong> ${qData.explanation}
-              </div>
-            </div>
-          `;
-        }
-
-        updateScore();
-      });
-    });
-
     updateScore();
   }
 
-  function updateScore() {
-    const total = QUIZ_QUESTIONS.length;
-    const correctCount = Object.values(answered).filter(v => v === true || v.isCorrect === true).length;
-    if (scoreBadge) {
-      scoreBadge.textContent = `Skor: ${correctCount} / ${total}`;
-    }
-  }
+  // Answer selection listener
+  container.addEventListener('click', (e) => {
+    const optBtn = e.target.closest('.quiz-opt-btn');
+    if (optBtn && !optBtn.classList.contains('disabled')) {
+      const qIdx = parseInt(optBtn.getAttribute('data-q'), 10);
+      const selectedOpt = parseInt(optBtn.getAttribute('data-opt'), 10);
+      const question = QUIZ_QUESTIONS[qIdx];
+      const isCorrect = (selectedOpt === question.correct);
 
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      answered = {};
-      localStorage.removeItem('yigit_quiz_answered');
+      answeredMap[qIdx] = {
+        selected: selectedOpt,
+        isCorrect: isCorrect
+      };
+
+      localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(answeredMap));
       renderQuiz();
-      showToast('Sınav sıfırlandı. Tekrar başarılar!', '🔄');
+
+      if (isCorrect) {
+        showToast('Tebrikler Yiğit! Doğru cevap.', '🎉');
+      } else {
+        showToast('Tuzağa düştün! Açıklamayı oku.', '💡');
+      }
+    }
+  });
+
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      if (confirm('Tüm quiz yanıtların sıfırlansın mı?')) {
+        answeredMap = {};
+        localStorage.removeItem(QUIZ_STORAGE_KEY);
+        renderQuiz();
+        showToast('Quiz sıfırlandı.', '🔄');
+      }
     });
   }
 
+  // Initial render
   renderQuiz();
 }
 
 /* ==========================================================================
-   10. 28-DAY STUDY PLAN CHECKLIST
+   12. 28-DAY STUDY PLAN MODULE
    ========================================================================== */
+const PLAN_STORAGE_KEY = 'yigit_study_plan_checked';
+
 function initStudyPlan() {
   const container = document.getElementById('study-plan-container');
   const badge = document.getElementById('plan-progress-badge');
+  const progressFill = document.getElementById('plan-progress-fill');
+  const btnReset = document.getElementById('btn-reset-plan');
 
   if (!container || typeof STUDY_PLAN === 'undefined') return;
 
   function getCheckedDays() {
     try {
-      return new Set(JSON.parse(localStorage.getItem('yigit_study_plan_checked') || '[]'));
+      return new Set(JSON.parse(localStorage.getItem(PLAN_STORAGE_KEY) || '[]'));
     } catch {
       return new Set();
     }
   }
 
   function saveCheckedDays(set) {
-    localStorage.setItem('yigit_study_plan_checked', JSON.stringify(Array.from(set)));
+    localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(Array.from(set)));
     updatePlanBadge();
   }
 
@@ -1159,9 +2113,9 @@ function initStudyPlan() {
     const count = checked.size;
     const total = STUDY_PLAN.length;
     const pct = Math.round((count / total) * 100);
-    if (badge) {
-      badge.textContent = `${count} / ${total} Gün Tamamlandı (%${pct})`;
-    }
+
+    if (badge) badge.textContent = `${count} / ${total} Gün Tamamlandı (%${pct})`;
+    if (progressFill) progressFill.style.width = `${pct}%`;
   }
 
   function renderPlan() {
@@ -1169,494 +2123,310 @@ function initStudyPlan() {
 
     const weeks = [
       { num: 1, title: 'Hafta 1: Fluency & Akıcılık İskeletleri (Part 1 Odaklı)', days: STUDY_PLAN.slice(0, 7) },
-      { num: 2, title: 'Hafta 2: 50 Dilbilgisi Kuralı & Hata Eliminasyonu', days: STUDY_PLAN.slice(7, 14) },
-      { num: 3, title: 'Hafta 3: 107 Deyim & Part 2 Cue Card Ustalığı', days: STUDY_PLAN.slice(14, 21) },
-      { num: 4, title: 'Hafta 4: Part 3 Felsefi Tartışma & Tam Deneme Sınavları', days: STUDY_PLAN.slice(21, 28) }
+      { num: 2, title: 'Hafta 2: Part 2 Cue Card Ustalığı & Hikaye Anlatımı', days: STUDY_PLAN.slice(7, 14) },
+      { num: 3, title: 'Hafta 3: Part 3 Analitik Düşünce & Soyut Tartışma', days: STUDY_PLAN.slice(14, 21) },
+      { num: 4, title: 'Hafta 4: Full Mock Sınavlar & Hata Eliminasyonu', days: STUDY_PLAN.slice(21, 28) }
     ];
 
     container.innerHTML = weeks.map(w => `
-      <div style="margin-bottom: 24px;">
-        <h3 style="font-size: 15px; font-weight: 800; color: var(--brand-blue); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-          <span>🗓️</span>
-          <span>${w.title}</span>
+      <div class="week-card">
+        <h3 class="week-title">
+          <span>📅 ${w.title}</span>
         </h3>
-        
-        ${w.days.map(d => {
-          const isDone = checked.has(d.day);
-          return `
-            <div class="plan-item ${isDone ? 'completed' : ''}" id="plan-day-${d.day}">
-              <input type="checkbox" class="plan-checkbox" data-day="${d.day}" ${isDone ? 'checked' : ''}>
-              <div style="flex: 1;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                  <strong class="plan-title" style="font-size: 14px;">Gün ${d.day}: ${d.title}</strong>
-                  <span class="badge ${d.title.includes('Deneme') ? 'badge-danger' : 'badge-primary'}">Hafta ${d.week}</span>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${w.days.map(d => {
+            const isDone = checked.has(d.day);
+            return `
+              <div class="plan-day-item ${isDone ? 'completed' : ''}" id="plan-day-${d.day}">
+                <span class="day-badge">Gün ${d.day}</span>
+                <div class="plan-day-content">
+                  <h4 class="plan-day-title">${d.focus || d.title || 'Günlük Çalışma'}</h4>
+                  <p class="plan-day-task">${d.task || d.desc || ''}</p>
                 </div>
-                <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">${d.desc}</div>
+                <label class="checkbox-label" style="align-self: center;">
+                  <input type="checkbox" class="plan-check-input" data-day="${d.day}" ${isDone ? 'checked' : ''} style="display: none;">
+                  <span class="checkbox-custom">${isDone ? '✓' : ''}</span>
+                </label>
               </div>
-            </div>
-          `;
-        }).join('')}
+            `;
+          }).join('')}
+        </div>
       </div>
     `).join('');
-
-    container.querySelectorAll('.plan-checkbox').forEach(cb => {
-      cb.addEventListener('change', () => {
-        const day = parseInt(cb.getAttribute('data-day'), 10);
-        const set = getCheckedDays();
-        if (cb.checked) {
-          set.add(day);
-          showToast(`Gün ${day} tamamlandı! Harika gidiyorsun Yiğit! 🚀`, '🎯');
-        } else {
-          set.delete(day);
-        }
-        saveCheckedDays(set);
-        renderPlan();
-      });
-    });
 
     updatePlanBadge();
   }
 
+  // Checkbox toggle listener
+  container.addEventListener('change', (e) => {
+    if (e.target.classList.contains('plan-check-input')) {
+      const day = parseInt(e.target.getAttribute('data-day'), 10);
+      const checked = getCheckedDays();
+      const itemRow = document.getElementById(`plan-day-${day}`);
+
+      if (e.target.checked) {
+        checked.add(day);
+        if (itemRow) itemRow.classList.add('completed');
+        showToast(`Gün ${day} tamamlandı! Aferin Yiğit.`, '🏆');
+      } else {
+        checked.delete(day);
+        if (itemRow) itemRow.classList.remove('completed');
+      }
+
+      saveCheckedDays(checked);
+      renderPlan();
+    }
+  });
+
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      if (confirm('28 Günlük çalışma planı ilerlemen sıfırlansın mı?')) {
+        localStorage.removeItem(PLAN_STORAGE_KEY);
+        updatePlanBadge();
+        renderPlan();
+        showToast('Çalışma planı sıfırlandı.', '🔄');
+      }
+    });
+  }
+
+  // Initial render
   renderPlan();
 }
 
 /* ==========================================================================
-   11. REAL SMART SEARCH ENGINE (Fuzzy, Normalized, Typo-Tolerant)
+   13. GLOBAL FUZZY SEARCH ENGINE
    ========================================================================== */
+function normalizeForSearch(str) {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .replace(/[ıİ]/g, 'i')
+    .replace(/[ğĞ]/g, 'g')
+    .replace(/[üÜ]/g, 'u')
+    .replace(/[şŞ]/g, 's')
+    .replace(/[öÖ]/g, 'o')
+    .replace(/[çÇ]/g, 'c')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function initGlobalSearch() {
-  const searchInput = document.getElementById('global-search-input');
+  const input = document.getElementById('global-search-input');
   const dropdown = document.getElementById('search-results-dropdown');
-  const clearBtn = document.getElementById('btn-clear-search');
+  const resultsList = document.getElementById('search-results-list');
+  const btnClear = document.getElementById('btn-clear-search');
 
-  if (!searchInput || !dropdown) return;
+  if (!input || !dropdown || !resultsList) return;
 
-  // Build searchable database index
-  let searchIndex = [];
+  // Build searchable index from all data modules
+  const searchIndex = [];
 
-  function buildIndex() {
-    searchIndex = [];
-
-    // 1. 50 Grammar Rules
-    if (typeof GRAMMAR_POINTS !== 'undefined') {
-      GRAMMAR_POINTS.forEach(item => {
-        searchIndex.push({
-          id: `grammar-${item.id}`,
-          domId: `grammar-card-${item.id}`,
-          type: 'Gramer Kuralı',
-          badgeClass: 'badge-primary',
-          targetTab: 'grammar-rules',
-          title: `Kural ${item.id}: ${item.title}`,
-          content: `${item.title} ${item.rule || ''} ${(item.correct || []).join(' ')} ${(item.incorrect || []).join(' ')} ${item.tip || ''} ${item.category || ''}`,
-          snippet: item.rule || ((item.correct && item.correct[0]) ? `Doğru: ${item.correct[0]}` : '')
-        });
-      });
-    }
-
-    // 2. 107 Idioms
-    if (typeof IDIOMS_DATA !== 'undefined') {
-      IDIOMS_DATA.forEach(item => {
-        const phrase = item.phrase || item.idiom || '';
-        searchIndex.push({
-          id: `idiom-${item.id}`,
-          domId: `idiom-card-${item.id}`,
-          type: 'Deyim & İdiom',
-          badgeClass: 'badge-purple',
-          targetTab: 'idioms',
-          title: phrase,
-          content: `${phrase} ${item.meaning || ''} ${item.example || item.sample_sentence || ''} ${item.tip || item.teacher_note || ''} ${item.part || ''}`,
-          snippet: item.meaning || ''
-        });
-      });
-    }
-
-    // 3. Essential Tips (Sayfa 37 - 42)
-    if (typeof ESSENTIAL_TIPS !== 'undefined') {
-      // Part 1
-      if (ESSENTIAL_TIPS.part1 && ESSENTIAL_TIPS.part1.rules) {
-        ESSENTIAL_TIPS.part1.rules.forEach(r => {
-          searchIndex.push({
-            id: `tip-p1-${r.num}`,
-            domId: 'tips-container',
-            type: 'Part 1 İpucu',
-            badgeClass: 'badge-primary',
-            targetTab: 'essential-tips',
-            title: `Part 1 Kural ${r.num}: ${r.title}`,
-            content: `${r.title} ${r.teacherTip || ''} ${r.dialogue?.examiner || ''} ${r.dialogue?.candidate || ''} ${(r.phrases || []).join(' ')}`,
-            snippet: r.teacherTip || r.title
-          });
-        });
-      }
-      // Part 2
-      if (ESSENTIAL_TIPS.part2 && ESSENTIAL_TIPS.part2.rules) {
-        ESSENTIAL_TIPS.part2.rules.forEach(r => {
-          searchIndex.push({
-            id: `tip-p2-${r.num}`,
-            domId: 'tips-container',
-            type: 'Part 2 İpucu',
-            badgeClass: 'badge-warning',
-            targetTab: 'essential-tips',
-            title: `Part 2 Kural ${r.num}: ${r.title}`,
-            content: `${r.title} ${r.teacherTip || ''} ${(r.starters || []).join(' ')} ${(r.signposts || []).join(' ')}`,
-            snippet: r.teacherTip || r.title
-          });
-        });
-      }
-      // Part 3
-      if (ESSENTIAL_TIPS.part3 && ESSENTIAL_TIPS.part3.rules) {
-        ESSENTIAL_TIPS.part3.rules.forEach(r => {
-          searchIndex.push({
-            id: `tip-p3-${r.num}`,
-            domId: 'tips-container',
-            type: r.isGolden ? '⭐ Altın Kural (s. 41)' : 'Part 3 İpucu',
-            badgeClass: r.isGolden ? 'badge-danger' : 'badge-success',
-            targetTab: 'essential-tips',
-            title: `Part 3 Kural ${r.num}: ${r.title}`,
-            content: `${r.title} ${r.teacherTip || ''} speak more than the examiner`,
-            snippet: r.teacherTip || r.title
-          });
-        });
-      }
-      // General
-      if (ESSENTIAL_TIPS.general && ESSENTIAL_TIPS.general.rules) {
-        ESSENTIAL_TIPS.general.rules.forEach(r => {
-          searchIndex.push({
-            id: `tip-gen-${r.num}`,
-            domId: 'tips-container',
-            type: 'Genel Kural',
-            badgeClass: 'badge-purple',
-            targetTab: 'essential-tips',
-            title: `Genel Kural ${r.num}: ${r.title}`,
-            content: `${r.title} ${r.teacherTip || ''}`,
-            snippet: r.teacherTip || r.title
-          });
-        });
-      }
-    }
-
-    // 4. Fluency Templates
-    searchIndex.push(
-      {
-        id: 'fluency-stalling',
-        domId: 'sec-fluency',
-        type: 'Akıcılık Şablonu',
+  // 1. 50 Grammar Rules
+  if (typeof GRAMMAR_POINTS !== 'undefined') {
+    GRAMMAR_POINTS.forEach(item => {
+      searchIndex.push({
+        id: `grammar-${item.id}`,
+        domId: `grammar-card-${item.id}`,
+        tab: 'grammar-rules',
+        category: 'Gramer Kuralı',
         badgeClass: 'badge-primary',
-        targetTab: 'fluency',
-        title: 'Zaman Kazanma (Stalling Phrases)',
-        content: "That's an intriguing question stalling thinking time sessiz kalmama düşünme payı kazanma",
-        snippet: "Zor sorularda sessiz kalmadan 3-4 saniye düşünme payı kazanma kalıpları."
-      },
-      {
-        id: 'fluency-catchy',
-        domId: 'sec-fluency',
-        type: 'Akıcılık Şablonu',
+        title: `Kural ${item.id}: ${item.title}`,
+        snippet: item.rule || (item.correct ? item.correct[0] : ''),
+        searchCorpus: `${item.title} ${item.rule} ${(item.correct || []).join(' ')} ${(item.incorrect || []).join(' ')} ${item.tip} ${item.category}`
+      });
+    });
+  }
+
+  // 2. 107 Idioms
+  if (typeof IDIOMS_DATA !== 'undefined') {
+    IDIOMS_DATA.forEach(item => {
+      searchIndex.push({
+        id: `idiom-${item.id}`,
+        domId: `idiom-card-${item.id}`,
+        tab: 'idioms',
+        category: 'Deyim / İdiom',
+        badgeClass: 'badge-purple',
+        title: `"${item.phrase}"`,
+        snippet: `${item.meaning} - Örnek: "${item.example}"`,
+        searchCorpus: `${item.phrase} ${item.meaning} ${item.example} ${item.tip} ${item.part} ${item.set}`
+      });
+    });
+  }
+
+  // 3. Essential Tips
+  if (typeof ESSENTIAL_TIPS !== 'undefined') {
+    // Part 1 rules
+    (ESSENTIAL_TIPS.part1?.rules || []).forEach(r => {
+      searchIndex.push({
+        id: `tip-p1-${r.num}`,
+        domId: 'tip-card-part1',
+        tab: 'essential-tips',
+        category: 'Part 1 İpucu',
         badgeClass: 'badge-warning',
-        targetTab: 'fluency',
-        title: 'Part 2 Manşet Açılışları (Catchy Starters)',
-        content: "If I was about to lose everything catchy starters vurucu giriş anı anlatımı",
-        snippet: "Kitap sayfa 39'daki vurucu ilk cümle şablonları."
-      },
-      {
-        id: 'fluency-recovery',
-        domId: 'sec-fluency',
-        type: 'İletişim Kurtarma',
-        badgeClass: 'badge-danger',
-        targetTab: 'fluency',
-        title: 'Soru Anlaşılmadığında Kurtarma Kalıpları (A, B, C)',
-        content: "Could you explain what you mean repeat question anlamadığında kurtarma kalıbı",
-        snippet: "Sınavda soruyu kaçırdığınızda puan kaybetmeden nazikçe tekrar ettirme kalıpları."
-      }
-    );
+        title: `Part 1 Kural ${r.num}: ${r.title}`,
+        snippet: r.teacherTip || '',
+        searchCorpus: `${r.title} ${r.teacherTip || ''} ${(r.dialogue ? r.dialogue.candidate : '')}`
+      });
+    });
+
+    // Part 2 rules
+    (ESSENTIAL_TIPS.part2?.rules || []).forEach(r => {
+      searchIndex.push({
+        id: `tip-p2-${r.num}`,
+        domId: 'tip-card-part2',
+        tab: 'essential-tips',
+        category: 'Part 2 İpucu',
+        badgeClass: 'badge-warning',
+        title: `Part 2 Kural ${r.num}: ${r.title}`,
+        snippet: r.teacherTip || r.content || '',
+        searchCorpus: `${r.title} ${r.content || ''} ${r.teacherTip || ''}`
+      });
+    });
+
+    // Part 3 rules
+    (ESSENTIAL_TIPS.part3?.rules || []).forEach(r => {
+      searchIndex.push({
+        id: `tip-p3-${r.num}`,
+        domId: 'tip-card-part3',
+        tab: 'essential-tips',
+        category: 'Part 3 İpucu',
+        badgeClass: 'badge-warning',
+        title: `Part 3 Kural ${r.num}: ${r.title}`,
+        snippet: r.teacherTip || '',
+        searchCorpus: `${r.title} ${r.teacherTip || ''} ${(r.recoveryQuestions || []).join(' ')}`
+      });
+    });
   }
 
-  buildIndex();
+  // 4. Fluency Categories & Phrases
+  FLUENCY_CATEGORIES_DATA.forEach(cat => {
+    cat.phrases.forEach((p, idx) => {
+      searchIndex.push({
+        id: `fluency-${cat.id}-${idx}`,
+        domId: `fluency-cat-${cat.id}`,
+        tab: 'fluency',
+        category: 'Fluency İskeleti',
+        badgeClass: 'badge-success',
+        title: `"${p.en}"`,
+        snippet: `${cat.title} - ${p.tr}`,
+        searchCorpus: `${p.en} ${p.tr} ${cat.title} ${cat.desc} ${cat.teacherTip}`
+      });
+    });
+  });
 
-  // Text normalization: lowercase, Turkish to Latin, strip punctuation
-  function normalizeText(str) {
-    if (!str) return '';
-    return str
-      .toLowerCase()
-      .replace(/ğ/g, 'g')
-      .replace(/ü/g, 'u')
-      .replace(/ş/g, 's')
-      .replace(/ı/g, 'i')
-      .replace(/ö/g, 'o')
-      .replace(/ç/g, 'c')
-      .replace(/â/g, 'a')
-      .replace(/î/g, 'i')
-      .replace(/[^a-z0-9]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  // Levenshtein distance for typo tolerance
-  function editDistance(a, b) {
-    if (a.length === 0) return b.length;
-    if (b.length === 0) return a.length;
-    const matrix = [];
-    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-
-    for (let i = 1; i <= b.length; i++) {
-      for (let j = 1; j <= a.length; j++) {
-        if (b.charAt(i - 1) === a.charAt(j - 1)) {
-          matrix[i][j] = matrix[i - 1][j - 1];
-        } else {
-          matrix[i][j] = Math.min(
-            matrix[i - 1][j - 1] + 1, // substitution
-            matrix[i][j - 1] + 1,     // insertion
-            matrix[i - 1][j] + 1      // deletion
-          );
-        }
-      }
-    }
-    return matrix[b.length][a.length];
-  }
-
-  // Fuzzy match scorer
-  function scoreMatch(queryNorm, queryWords, targetText, targetNorm) {
-    if (!targetNorm) return 0;
-
-    // 1. Exact full match
-    if (targetNorm === queryNorm) return 300;
-    if (targetNorm.startsWith(queryNorm)) return 200;
-    if (targetNorm.includes(queryNorm)) return 150;
-
-    // 2. All query words match
-    let wordsMatched = 0;
-    const targetWords = targetNorm.split(' ');
-
-    for (const qWord of queryWords) {
-      if (qWord.length < 2) continue;
-
-      let wordFound = false;
-      // Direct word match or substring
-      for (const tWord of targetWords) {
-        if (tWord === qWord) {
-          wordFound = true;
-          wordsMatched += 2;
-          break;
-        } else if (tWord.startsWith(qWord)) {
-          wordFound = true;
-          wordsMatched += 1.5;
-          break;
-        } else if (tWord.includes(qWord)) {
-          wordFound = true;
-          wordsMatched += 1;
-          break;
-        } else if (qWord.length >= 4 && tWord.length >= 4) {
-          // Typo tolerance: edit distance <= 2 for words >= 4 chars
-          const dist = editDistance(qWord, tWord);
-          if (dist <= 1 || (qWord.length >= 6 && dist <= 2)) {
-            wordFound = true;
-            wordsMatched += 1.2;
-            break;
-          }
-        }
-      }
-    }
-
-    if (queryWords.length > 0 && wordsMatched > 0) {
-      return (wordsMatched / queryWords.length) * 100;
-    }
-
-    return 0;
-  }
-
-  function highlightMatches(text, queryWords) {
-    if (!text || queryWords.length === 0) return text;
-    let safeText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    for (const w of queryWords) {
-      if (w.length < 2) continue;
-      const regex = new RegExp(`(${w})`, 'gi');
-      safeText = safeText.replace(regex, '<span class="search-match-mark">$1</span>');
-    }
-    return safeText;
-  }
-
-  let selectedResultIndex = -1;
-  let currentResults = [];
+  // Pre-normalize index
+  searchIndex.forEach(item => {
+    item.normalizedCorpus = normalizeForSearch(item.searchCorpus);
+  });
 
   function performSearch() {
-    const rawQuery = searchInput.value.trim();
-    if (clearBtn) clearBtn.style.display = rawQuery ? 'flex' : 'none';
-
+    const rawQuery = input.value.trim();
     if (!rawQuery) {
-      dropdown.style.display = 'none';
-      dropdown.innerHTML = '';
-      currentResults = [];
-      selectedResultIndex = -1;
+      dropdown.classList.remove('visible');
+      if (btnClear) btnClear.classList.remove('visible');
       return;
     }
 
-    const queryNorm = normalizeText(rawQuery);
-    const queryWords = queryNorm.split(' ').filter(w => w.length > 0);
+    if (btnClear) btnClear.classList.add('visible');
 
-    const scored = searchIndex.map(item => {
-      const titleNorm = normalizeText(item.title);
-      const contentNorm = normalizeText(item.content);
+    const normQuery = normalizeForSearch(rawQuery);
+    const tokens = normQuery.split(' ').filter(t => t.length > 0);
 
-      const titleScore = scoreMatch(queryNorm, queryWords, item.title, titleNorm);
-      const contentScore = scoreMatch(queryNorm, queryWords, item.content, contentNorm);
+    // Filter index
+    const matches = searchIndex.filter(item => {
+      return tokens.every(token => item.normalizedCorpus.includes(token));
+    }).slice(0, 15); // Show top 15 results
 
-      const totalScore = (titleScore * 2.0) + contentScore;
-      return { item, totalScore };
-    }).filter(res => res.totalScore > 15);
-
-    scored.sort((a, b) => b.totalScore - a.totalScore);
-    currentResults = scored.slice(0, 12).map(s => s.item);
-    selectedResultIndex = -1;
-
-    renderDropdown(rawQuery, queryWords);
-  }
-
-  function renderDropdown(rawQuery, queryWords) {
-    if (currentResults.length === 0) {
-      dropdown.innerHTML = `
-        <div style="padding: 18px 14px; text-align: center; color: var(--text-muted); font-size: 13px;">
-          <div>🔍 <strong>"${rawQuery}"</strong> için sonuç bulunamadı.</div>
-          <div style="font-size: 11.5px; margin-top: 6px; color: var(--text-muted);">
-            İpucu: 'important', 'succeed', 'speak more', 'Part 2', 'edat' gibi terimler arayabilirsiniz.
-          </div>
+    if (matches.length === 0) {
+      resultsList.innerHTML = `
+        <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 13px;">
+          "${rawQuery}" için eşleşen içerik bulunamadı.
         </div>
       `;
-      dropdown.style.display = 'block';
-      return;
-    }
-
-    let html = `
-      <div class="search-header-info">
-        <span>${currentResults.length} Sonuç Bulundu</span>
-        <span style="font-size: 10.5px; opacity: 0.8;">Seçmek için tıkla veya ↵ Enter</span>
-      </div>
-    `;
-
-    html += currentResults.map((item, idx) => `
-      <div class="search-result-item" data-index="${idx}">
-        <div class="search-item-top">
-          <div class="search-item-title">${highlightMatches(item.title, queryWords)}</div>
-          <span class="badge ${item.badgeClass}">${item.type}</span>
+    } else {
+      resultsList.innerHTML = matches.map(m => `
+        <div class="search-result-item" data-tab="${m.tab}" data-dom="${m.domId}">
+          <div class="search-item-top">
+            <span class="search-item-title">${m.title}</span>
+            <span class="badge ${m.badgeClass}">${m.category}</span>
+          </div>
+          <div class="search-item-snippet">${m.snippet}</div>
         </div>
-        <div class="search-item-snippet">${highlightMatches(item.snippet, queryWords)}</div>
-      </div>
-    `).join('');
+      `).join('');
+    }
 
-    dropdown.innerHTML = html;
-    dropdown.style.display = 'block';
+    dropdown.classList.add('visible');
+  }
 
-    // Click handler on results
-    dropdown.querySelectorAll('.search-result-item').forEach(itemEl => {
-      itemEl.addEventListener('click', () => {
-        const idx = parseInt(itemEl.getAttribute('data-index'), 10);
-        selectResult(currentResults[idx]);
-      });
+  input.addEventListener('input', performSearch);
+  input.addEventListener('focus', performSearch);
+
+  if (btnClear) {
+    btnClear.addEventListener('click', () => {
+      input.value = '';
+      dropdown.classList.remove('visible');
+      btnClear.classList.remove('visible');
+      input.focus();
     });
   }
 
-  function selectResult(item) {
-    if (!item) return;
+  // Handle click on search item
+  resultsList.addEventListener('click', (e) => {
+    const item = e.target.closest('.search-result-item');
+    if (item) {
+      const tab = item.getAttribute('data-tab');
+      const domId = item.getAttribute('data-dom');
 
-    // 1. Switch to tab
-    const navLink = document.querySelector(`.nav-link[data-target="${item.targetTab}"]`);
-    if (navLink) navLink.click();
+      dropdown.classList.remove('visible');
 
-    dropdown.style.display = 'none';
-
-    // 2. Find target element and pulse it
-    setTimeout(() => {
-      let targetEl = null;
-      if (item.domId) {
-        targetEl = document.getElementById(item.domId);
+      if (window.switchTab) {
+        window.switchTab(tab);
       }
 
-      if (targetEl) {
-        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        targetEl.classList.remove('pulse-target');
-        void targetEl.offsetWidth; // trigger reflow
-        targetEl.classList.add('pulse-target');
-        setTimeout(() => targetEl.classList.remove('pulse-target'), 2600);
-      }
-    }, 150);
-
-    showToast(`"${item.title}" sonucuna gidildi`, '📍');
-  }
-
-  // Keyboard navigation (Escape, ArrowDown, ArrowUp, Enter)
-  searchInput.addEventListener('keydown', (e) => {
-    if (dropdown.style.display !== 'block') return;
-
-    const items = dropdown.querySelectorAll('.search-result-item');
-    if (items.length === 0) return;
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      selectedResultIndex = (selectedResultIndex + 1) % items.length;
-      updateSelectedHighlight(items);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      selectedResultIndex = (selectedResultIndex - 1 + items.length) % items.length;
-      updateSelectedHighlight(items);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (selectedResultIndex >= 0 && selectedResultIndex < currentResults.length) {
-        selectResult(currentResults[selectedResultIndex]);
-      } else if (currentResults.length > 0) {
-        selectResult(currentResults[0]);
-      }
-    } else if (e.key === 'Escape') {
-      dropdown.style.display = 'none';
+      setTimeout(() => {
+        const targetEl = document.getElementById(domId);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          targetEl.classList.remove('pulse-target');
+          void targetEl.offsetWidth; // trigger reflow
+          targetEl.classList.add('pulse-target');
+        }
+      }, 250);
     }
   });
-
-  function updateSelectedHighlight(items) {
-    items.forEach((el, i) => {
-      if (i === selectedResultIndex) {
-        el.classList.add('selected');
-        el.scrollIntoView({ block: 'nearest' });
-      } else {
-        el.classList.remove('selected');
-      }
-    });
-  }
-
-  searchInput.addEventListener('input', performSearch);
-  searchInput.addEventListener('focus', () => {
-    if (searchInput.value.trim()) performSearch();
-  });
-
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      searchInput.value = '';
-      searchInput.focus();
-      dropdown.style.display = 'none';
-      clearBtn.style.display = 'none';
-    });
-  }
 
   // Close dropdown on outside click
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.search-box')) {
-      dropdown.style.display = 'none';
+    if (!e.target.closest('.global-search-container')) {
+      dropdown.classList.remove('visible');
     }
   });
 }
 
 /* ==========================================================================
-   12. TOAST NOTIFICATION HELPER
+   14. TOAST NOTIFICATION SYSTEM
    ========================================================================== */
-let toastTimeout = null;
 function showToast(message, icon = 'ℹ️') {
-  const box = document.getElementById('toast-box');
-  const msgEl = document.getElementById('toast-message');
-  const iconEl = document.getElementById('toast-icon');
+  const container = document.getElementById('toast-container');
+  if (!container) return;
 
-  if (!box || !msgEl) return;
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `
+    <span style="font-size: 18px; line-height: 1;">${icon}</span>
+    <span>${message}</span>
+  `;
 
-  clearTimeout(toastTimeout);
-  msgEl.textContent = message;
-  if (iconEl) iconEl.textContent = icon;
+  container.appendChild(toast);
 
-  box.classList.add('show');
-  toastTimeout = setTimeout(() => {
-    box.classList.remove('show');
-  }, 3200);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    toast.style.transition = 'all 0.3s ease';
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 300);
+  }, 2800);
 }

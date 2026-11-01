@@ -5,4 +5,8 @@ __pycache__/
 *.json
 !chat_history.json
 images/
+New folder/
+*.png
+test*
+OcrHelper.cs
 .git/
