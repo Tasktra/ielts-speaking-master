@@ -365,13 +365,33 @@ function initEssentialTips() {
 /* ==========================================================================
    5. TTS AUDIO PLAYER (SpeechSynthesis)
    ========================================================================== */
+function cleanEnglishForSpeech(raw) {
+  if (!raw) return '';
+  return raw
+    // 1. Remove all parentheses contents (e.g. Turkish translations like '(Telefon çaldığında...)')
+    .replace(/\([^)]*\)/g, ' ')
+    // 2. Remove square brackets [like this]
+    .replace(/\[[^\]]*\]/g, ' ')
+    // 3. Remove curly braces
+    .replace(/\{[^}]*\}/g, ' ')
+    // 4. Remove Turkish annotations after pipe '|'
+    .split('|')[0]
+    // 5. Remove quotes and clean spaces
+    .replace(/["“”«»]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function speakText(text) {
   if (!('speechSynthesis' in window)) {
     showToast('Tarayıcınız ses sentezini desteklemiyor.', '⚠️');
     return;
   }
+  const clean = cleanEnglishForSpeech(text);
+  if (!clean) return;
+
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
+  const utterance = new SpeechSynthesisUtterance(clean);
   utterance.lang = 'en-GB';
   utterance.rate = 0.92;
   utterance.pitch = 1.0;
@@ -1201,27 +1221,421 @@ function initStudyPlan() {
 }
 
 /* ==========================================================================
-   11. GLOBAL SEARCH CONTROLLER
+   11. REAL SMART SEARCH ENGINE (Fuzzy, Normalized, Typo-Tolerant)
    ========================================================================== */
 function initGlobalSearch() {
   const searchInput = document.getElementById('global-search-input');
-  if (!searchInput) return;
+  const dropdown = document.getElementById('search-results-dropdown');
+  const clearBtn = document.getElementById('btn-clear-search');
 
-  searchInput.addEventListener('input', (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    if (!q) return;
+  if (!searchInput || !dropdown) return;
 
-    if (q.length >= 3) {
-      if (q.includes('idiom') || q.includes('deyim') || q.includes('piece') || q.includes('moon') || q.includes('cloud')) {
-        const link = document.querySelector('.nav-link[data-target="idioms"]');
-        if (link) link.click();
-      } else if (q.includes('kural') || q.includes('gramer') || q.includes('rule') || q.includes('important') || q.includes('believe')) {
-        const link = document.querySelector('.nav-link[data-target="grammar-rules"]');
-        if (link) link.click();
-      } else if (q.includes('part 1') || q.includes('part 2') || q.includes('part 3') || q.includes('tip') || q.includes('hoorn') || q.includes('speak more')) {
-        const link = document.querySelector('.nav-link[data-target="essential-tips"]');
-        if (link) link.click();
+  // Build searchable database index
+  let searchIndex = [];
+
+  function buildIndex() {
+    searchIndex = [];
+
+    // 1. 50 Grammar Rules
+    if (typeof GRAMMAR_POINTS !== 'undefined') {
+      GRAMMAR_POINTS.forEach(item => {
+        searchIndex.push({
+          id: `grammar-${item.id}`,
+          domId: `grammar-card-${item.id}`,
+          type: 'Gramer Kuralı',
+          badgeClass: 'badge-primary',
+          targetTab: 'grammar-rules',
+          title: `Kural ${item.id}: ${item.title}`,
+          content: `${item.title} ${item.rule || ''} ${(item.correct || []).join(' ')} ${(item.incorrect || []).join(' ')} ${item.tip || ''} ${item.category || ''}`,
+          snippet: item.rule || ((item.correct && item.correct[0]) ? `Doğru: ${item.correct[0]}` : '')
+        });
+      });
+    }
+
+    // 2. 107 Idioms
+    if (typeof IDIOMS_DATA !== 'undefined') {
+      IDIOMS_DATA.forEach(item => {
+        const phrase = item.phrase || item.idiom || '';
+        searchIndex.push({
+          id: `idiom-${item.id}`,
+          domId: `idiom-card-${item.id}`,
+          type: 'Deyim & İdiom',
+          badgeClass: 'badge-purple',
+          targetTab: 'idioms',
+          title: phrase,
+          content: `${phrase} ${item.meaning || ''} ${item.example || item.sample_sentence || ''} ${item.tip || item.teacher_note || ''} ${item.part || ''}`,
+          snippet: item.meaning || ''
+        });
+      });
+    }
+
+    // 3. Essential Tips (Sayfa 37 - 42)
+    if (typeof ESSENTIAL_TIPS !== 'undefined') {
+      // Part 1
+      if (ESSENTIAL_TIPS.part1 && ESSENTIAL_TIPS.part1.rules) {
+        ESSENTIAL_TIPS.part1.rules.forEach(r => {
+          searchIndex.push({
+            id: `tip-p1-${r.num}`,
+            domId: 'tips-container',
+            type: 'Part 1 İpucu',
+            badgeClass: 'badge-primary',
+            targetTab: 'essential-tips',
+            title: `Part 1 Kural ${r.num}: ${r.title}`,
+            content: `${r.title} ${r.teacherTip || ''} ${r.dialogue?.examiner || ''} ${r.dialogue?.candidate || ''} ${(r.phrases || []).join(' ')}`,
+            snippet: r.teacherTip || r.title
+          });
+        });
       }
+      // Part 2
+      if (ESSENTIAL_TIPS.part2 && ESSENTIAL_TIPS.part2.rules) {
+        ESSENTIAL_TIPS.part2.rules.forEach(r => {
+          searchIndex.push({
+            id: `tip-p2-${r.num}`,
+            domId: 'tips-container',
+            type: 'Part 2 İpucu',
+            badgeClass: 'badge-warning',
+            targetTab: 'essential-tips',
+            title: `Part 2 Kural ${r.num}: ${r.title}`,
+            content: `${r.title} ${r.teacherTip || ''} ${(r.starters || []).join(' ')} ${(r.signposts || []).join(' ')}`,
+            snippet: r.teacherTip || r.title
+          });
+        });
+      }
+      // Part 3
+      if (ESSENTIAL_TIPS.part3 && ESSENTIAL_TIPS.part3.rules) {
+        ESSENTIAL_TIPS.part3.rules.forEach(r => {
+          searchIndex.push({
+            id: `tip-p3-${r.num}`,
+            domId: 'tips-container',
+            type: r.isGolden ? '⭐ Altın Kural (s. 41)' : 'Part 3 İpucu',
+            badgeClass: r.isGolden ? 'badge-danger' : 'badge-success',
+            targetTab: 'essential-tips',
+            title: `Part 3 Kural ${r.num}: ${r.title}`,
+            content: `${r.title} ${r.teacherTip || ''} speak more than the examiner`,
+            snippet: r.teacherTip || r.title
+          });
+        });
+      }
+      // General
+      if (ESSENTIAL_TIPS.general && ESSENTIAL_TIPS.general.rules) {
+        ESSENTIAL_TIPS.general.rules.forEach(r => {
+          searchIndex.push({
+            id: `tip-gen-${r.num}`,
+            domId: 'tips-container',
+            type: 'Genel Kural',
+            badgeClass: 'badge-purple',
+            targetTab: 'essential-tips',
+            title: `Genel Kural ${r.num}: ${r.title}`,
+            content: `${r.title} ${r.teacherTip || ''}`,
+            snippet: r.teacherTip || r.title
+          });
+        });
+      }
+    }
+
+    // 4. Fluency Templates
+    searchIndex.push(
+      {
+        id: 'fluency-stalling',
+        domId: 'sec-fluency',
+        type: 'Akıcılık Şablonu',
+        badgeClass: 'badge-primary',
+        targetTab: 'fluency',
+        title: 'Zaman Kazanma (Stalling Phrases)',
+        content: "That's an intriguing question stalling thinking time sessiz kalmama düşünme payı kazanma",
+        snippet: "Zor sorularda sessiz kalmadan 3-4 saniye düşünme payı kazanma kalıpları."
+      },
+      {
+        id: 'fluency-catchy',
+        domId: 'sec-fluency',
+        type: 'Akıcılık Şablonu',
+        badgeClass: 'badge-warning',
+        targetTab: 'fluency',
+        title: 'Part 2 Manşet Açılışları (Catchy Starters)',
+        content: "If I was about to lose everything catchy starters vurucu giriş anı anlatımı",
+        snippet: "Kitap sayfa 39'daki vurucu ilk cümle şablonları."
+      },
+      {
+        id: 'fluency-recovery',
+        domId: 'sec-fluency',
+        type: 'İletişim Kurtarma',
+        badgeClass: 'badge-danger',
+        targetTab: 'fluency',
+        title: 'Soru Anlaşılmadığında Kurtarma Kalıpları (A, B, C)',
+        content: "Could you explain what you mean repeat question anlamadığında kurtarma kalıbı",
+        snippet: "Sınavda soruyu kaçırdığınızda puan kaybetmeden nazikçe tekrar ettirme kalıpları."
+      }
+    );
+  }
+
+  buildIndex();
+
+  // Text normalization: lowercase, Turkish to Latin, strip punctuation
+  function normalizeText(str) {
+    if (!str) return '';
+    return str
+      .toLowerCase()
+      .replace(/ğ/g, 'g')
+      .replace(/ü/g, 'u')
+      .replace(/ş/g, 's')
+      .replace(/ı/g, 'i')
+      .replace(/ö/g, 'o')
+      .replace(/ç/g, 'c')
+      .replace(/â/g, 'a')
+      .replace(/î/g, 'i')
+      .replace(/[^a-z0-9]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Levenshtein distance for typo tolerance
+  function editDistance(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1, // substitution
+            matrix[i][j - 1] + 1,     // insertion
+            matrix[i - 1][j] + 1      // deletion
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
+  }
+
+  // Fuzzy match scorer
+  function scoreMatch(queryNorm, queryWords, targetText, targetNorm) {
+    if (!targetNorm) return 0;
+
+    // 1. Exact full match
+    if (targetNorm === queryNorm) return 300;
+    if (targetNorm.startsWith(queryNorm)) return 200;
+    if (targetNorm.includes(queryNorm)) return 150;
+
+    // 2. All query words match
+    let wordsMatched = 0;
+    const targetWords = targetNorm.split(' ');
+
+    for (const qWord of queryWords) {
+      if (qWord.length < 2) continue;
+
+      let wordFound = false;
+      // Direct word match or substring
+      for (const tWord of targetWords) {
+        if (tWord === qWord) {
+          wordFound = true;
+          wordsMatched += 2;
+          break;
+        } else if (tWord.startsWith(qWord)) {
+          wordFound = true;
+          wordsMatched += 1.5;
+          break;
+        } else if (tWord.includes(qWord)) {
+          wordFound = true;
+          wordsMatched += 1;
+          break;
+        } else if (qWord.length >= 4 && tWord.length >= 4) {
+          // Typo tolerance: edit distance <= 2 for words >= 4 chars
+          const dist = editDistance(qWord, tWord);
+          if (dist <= 1 || (qWord.length >= 6 && dist <= 2)) {
+            wordFound = true;
+            wordsMatched += 1.2;
+            break;
+          }
+        }
+      }
+    }
+
+    if (queryWords.length > 0 && wordsMatched > 0) {
+      return (wordsMatched / queryWords.length) * 100;
+    }
+
+    return 0;
+  }
+
+  function highlightMatches(text, queryWords) {
+    if (!text || queryWords.length === 0) return text;
+    let safeText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    for (const w of queryWords) {
+      if (w.length < 2) continue;
+      const regex = new RegExp(`(${w})`, 'gi');
+      safeText = safeText.replace(regex, '<span class="search-match-mark">$1</span>');
+    }
+    return safeText;
+  }
+
+  let selectedResultIndex = -1;
+  let currentResults = [];
+
+  function performSearch() {
+    const rawQuery = searchInput.value.trim();
+    if (clearBtn) clearBtn.style.display = rawQuery ? 'flex' : 'none';
+
+    if (!rawQuery) {
+      dropdown.style.display = 'none';
+      dropdown.innerHTML = '';
+      currentResults = [];
+      selectedResultIndex = -1;
+      return;
+    }
+
+    const queryNorm = normalizeText(rawQuery);
+    const queryWords = queryNorm.split(' ').filter(w => w.length > 0);
+
+    const scored = searchIndex.map(item => {
+      const titleNorm = normalizeText(item.title);
+      const contentNorm = normalizeText(item.content);
+
+      const titleScore = scoreMatch(queryNorm, queryWords, item.title, titleNorm);
+      const contentScore = scoreMatch(queryNorm, queryWords, item.content, contentNorm);
+
+      const totalScore = (titleScore * 2.0) + contentScore;
+      return { item, totalScore };
+    }).filter(res => res.totalScore > 15);
+
+    scored.sort((a, b) => b.totalScore - a.totalScore);
+    currentResults = scored.slice(0, 12).map(s => s.item);
+    selectedResultIndex = -1;
+
+    renderDropdown(rawQuery, queryWords);
+  }
+
+  function renderDropdown(rawQuery, queryWords) {
+    if (currentResults.length === 0) {
+      dropdown.innerHTML = `
+        <div style="padding: 18px 14px; text-align: center; color: var(--text-muted); font-size: 13px;">
+          <div>🔍 <strong>"${rawQuery}"</strong> için sonuç bulunamadı.</div>
+          <div style="font-size: 11.5px; margin-top: 6px; color: var(--text-muted);">
+            İpucu: 'important', 'succeed', 'speak more', 'Part 2', 'edat' gibi terimler arayabilirsiniz.
+          </div>
+        </div>
+      `;
+      dropdown.style.display = 'block';
+      return;
+    }
+
+    let html = `
+      <div class="search-header-info">
+        <span>${currentResults.length} Sonuç Bulundu</span>
+        <span style="font-size: 10.5px; opacity: 0.8;">Seçmek için tıkla veya ↵ Enter</span>
+      </div>
+    `;
+
+    html += currentResults.map((item, idx) => `
+      <div class="search-result-item" data-index="${idx}">
+        <div class="search-item-top">
+          <div class="search-item-title">${highlightMatches(item.title, queryWords)}</div>
+          <span class="badge ${item.badgeClass}">${item.type}</span>
+        </div>
+        <div class="search-item-snippet">${highlightMatches(item.snippet, queryWords)}</div>
+      </div>
+    `).join('');
+
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+
+    // Click handler on results
+    dropdown.querySelectorAll('.search-result-item').forEach(itemEl => {
+      itemEl.addEventListener('click', () => {
+        const idx = parseInt(itemEl.getAttribute('data-index'), 10);
+        selectResult(currentResults[idx]);
+      });
+    });
+  }
+
+  function selectResult(item) {
+    if (!item) return;
+
+    // 1. Switch to tab
+    const navLink = document.querySelector(`.nav-link[data-target="${item.targetTab}"]`);
+    if (navLink) navLink.click();
+
+    dropdown.style.display = 'none';
+
+    // 2. Find target element and pulse it
+    setTimeout(() => {
+      let targetEl = null;
+      if (item.domId) {
+        targetEl = document.getElementById(item.domId);
+      }
+
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetEl.classList.remove('pulse-target');
+        void targetEl.offsetWidth; // trigger reflow
+        targetEl.classList.add('pulse-target');
+        setTimeout(() => targetEl.classList.remove('pulse-target'), 2600);
+      }
+    }, 150);
+
+    showToast(`"${item.title}" sonucuna gidildi`, '📍');
+  }
+
+  // Keyboard navigation (Escape, ArrowDown, ArrowUp, Enter)
+  searchInput.addEventListener('keydown', (e) => {
+    if (dropdown.style.display !== 'block') return;
+
+    const items = dropdown.querySelectorAll('.search-result-item');
+    if (items.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      selectedResultIndex = (selectedResultIndex + 1) % items.length;
+      updateSelectedHighlight(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      selectedResultIndex = (selectedResultIndex - 1 + items.length) % items.length;
+      updateSelectedHighlight(items);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedResultIndex >= 0 && selectedResultIndex < currentResults.length) {
+        selectResult(currentResults[selectedResultIndex]);
+      } else if (currentResults.length > 0) {
+        selectResult(currentResults[0]);
+      }
+    } else if (e.key === 'Escape') {
+      dropdown.style.display = 'none';
+    }
+  });
+
+  function updateSelectedHighlight(items) {
+    items.forEach((el, i) => {
+      if (i === selectedResultIndex) {
+        el.classList.add('selected');
+        el.scrollIntoView({ block: 'nearest' });
+      } else {
+        el.classList.remove('selected');
+      }
+    });
+  }
+
+  searchInput.addEventListener('input', performSearch);
+  searchInput.addEventListener('focus', () => {
+    if (searchInput.value.trim()) performSearch();
+  });
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      searchInput.focus();
+      dropdown.style.display = 'none';
+      clearBtn.style.display = 'none';
+    });
+  }
+
+  // Close dropdown on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-box')) {
+      dropdown.style.display = 'none';
     }
   });
 }
