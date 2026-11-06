@@ -10,3 +10,7 @@ New folder/
 test*
 OcrHelper.cs
 .git/
+
+allpages/
+otherbook/
+temp_pages/
