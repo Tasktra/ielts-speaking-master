@@ -12,6 +12,7 @@
   
   <!-- Main Stylesheet -->
   <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="question_bank.css">
 </head>
 <body data-theme="light">
 
@@ -84,6 +85,11 @@
         </a>
 
         <div class="sidebar-section-title">Kütüphane & İçerik</div>
+        <a class="nav-link" data-target="question-bank">
+          <span class="icon">📚</span>
+          <span>Soru & Model Bankası</span>
+          <span class="badge-count">199</span>
+        </a>
         <a class="nav-link" data-target="grammar-rules">
           <span class="icon">📐</span>
           <span>50 Gramer Kuralı</span>
@@ -123,12 +129,12 @@
           </div>
           <button class="btn-icon-top" id="btn-lock-sidebar" title="Portalı Kilitle / Çıkış Yap" style="width: 36px; height: 36px;">🔒</button>
         </div>
-        <div style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
-          <a href="IELTS_Speaking_Success_in_Speaking_Yigit_Kitap_Cevirisi.pdf" target="_blank" class="btn btn-outline" style="flex: 1; justify-content: center; font-size: 11px; padding: 6px 8px; text-decoration: none; border-color: var(--brand-blue); color: var(--brand-blue); font-weight: 700;" title="42 Sayfa Kitap PDF'i">
-            📕 Kitap PDF
+        <div style="display: flex; gap: 6px; margin-top: 10px; width: 100%;">
+          <a href="IELTS_Speaking_Success_in_Speaking_Yigit_Kitap_Cevirisi.pdf" target="_blank" class="btn btn-outline" style="flex: 1; justify-content: center; font-size: 10.5px; padding: 6px 4px; text-decoration: none; border-color: var(--brand-blue); color: var(--brand-blue); font-weight: 700;" title="Cilt 1: 42 Sayfa Rehber PDF">
+            📕 Cilt 1 (1-42)
           </a>
-          <a href="IELTS_Speaking_Success_in_Speaking_Yigit_Kitap_Cevirisi.html" target="_blank" class="btn btn-outline" style="flex: 1; justify-content: center; font-size: 11px; padding: 6px 8px; text-decoration: none; border-color: var(--brand-purple); color: var(--brand-purple); font-weight: 700;" title="42 Sayfa Birebir Çeviri">
-            📖 Çeviriler
+          <a href="IELTS_Speaking_Success_in_Speaking_Part2_Soru_Bankasi_Yigit_Sayfa_193_391.pdf" target="_blank" class="btn btn-outline" style="flex: 1; justify-content: center; font-size: 10.5px; padding: 6px 4px; text-decoration: none; border-color: var(--brand-purple); color: var(--brand-purple); font-weight: 700;" title="Cilt 2: 199 Sayfa Soru Bankası PDF">
+            📗 Cilt 2 (193-391)
           </a>
         </div>
       </div>
@@ -635,6 +641,86 @@
           </div>
         </section>
 
+
+        <!-- ==================================================================
+             SECTION 9: 199-PAGE QUESTION & ANSWER BANK (SAYFA 193-391)
+             ================================================================== -->
+        <section class="view-section" id="sec-question-bank">
+          <div class="card">
+            <div class="card-header" style="flex-direction: column; align-items: stretch; gap: 14px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <div class="card-title-group">
+                  <span style="font-size: 24px;">📚</span>
+                  <div>
+                    <h2 class="card-title">IELTS Speaking Soru & Model Cevap Bankası</h2>
+                    <p class="card-desc">Kitap Sayfa 193 – 391 Arası Tüm Konular (199 Sayfa, 1000+ Soru, Band 8 Model Cevaplar & Yiğit'e Özel Öğretmen Notları)</p>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <a href="IELTS_Speaking_Success_in_Speaking_Part2_Soru_Bankasi_Yigit_Sayfa_193_391.pdf" target="_blank" class="btn btn-sm btn-primary">
+                    <span>📥 Cilt 2 PDF İndir (193-391)</span>
+                  </a>
+                  <a href="IELTS_Speaking_Success_in_Speaking_Yigit_Kitap_Cevirisi.pdf" target="_blank" class="btn btn-sm btn-secondary">
+                    <span>📥 Cilt 1 PDF (1-42)</span>
+                  </a>
+                </div>
+              </div>
+
+              <!-- Top Toolbar: Search + Stats + Page Jumper -->
+              <div class="qb-controls">
+                <div class="qb-search-wrapper">
+                  <span class="qb-search-icon">🔍</span>
+                  <input type="text" id="qb-search-input" class="qb-search-input" placeholder="Soru, model cevap, Türkçe çeviri, konu veya sayfa numarası ara (örn: 205, museum, yemek, habit)...">
+                  <button id="btn-qb-search-clear" class="qb-search-clear" style="display: none;" title="Temizle">✕</button>
+                </div>
+
+                <div class="qb-top-toolbar">
+                  <span class="qb-stats-pill" id="qb-stats-badge">199 Sayfa Yükleniyor...</span>
+                  <div class="qb-jumper">
+                    <span style="font-size: 12.5px; color: var(--text-muted); font-weight: 600;">Sayfaya Git:</span>
+                    <input type="number" id="qb-jump-input" class="qb-jumper-input" min="193" max="391" placeholder="193-391">
+                    <button id="btn-qb-jump" class="btn btn-sm btn-secondary">Git ➜</button>
+                  </div>
+                </div>
+
+                <!-- Topic Category Filter Chips -->
+                <div class="qb-category-bar" id="qb-category-chips">
+                  <button class="chip active" data-cat="all">Tümü (199 Sayfa)</button>
+                  <button class="chip" data-cat="Müzeler & Sanat">🏛️ Müzeler & Sanat</button>
+                  <button class="chip" data-cat="Güzellik & Dış Görünüş">✨ Güzellik & Dış Görünüş</button>
+                  <button class="chip" data-cat="Kitaplar & Okuma">📚 Kitaplar & Okuma</button>
+                  <button class="chip" data-cat="Binalar & Konaklama">🏢 Binalar & Konaklama</button>
+                  <button class="chip" data-cat="İklim & Çevre">🌱 İklim & Çevre</button>
+                  <button class="chip" data-cat="Bilgisayar & Teknoloji">💻 Bilgisayar & Teknoloji</button>
+                  <button class="chip" data-cat="Eğitim & Egzersiz">🎓 Eğitim & Egzersiz</button>
+                  <button class="chip" data-cat="Aile & Akrabalar">👨‍👩‍👧‍👦 Aile & Akrabalar</button>
+                  <button class="chip" data-cat="Moda, Kıyafet & Takı">👔 Moda, Kıyafet & Takı</button>
+                  <button class="chip" data-cat="Yemek, Diyet & Restoranlar">🍲 Yemek, Diyet & Restoranlar</button>
+                  <button class="chip" data-cat="Arkadaşlar & Sosyal İlişkiler">🤝 Arkadaşlar & İlişkiler</button>
+                  <button class="chip" data-cat="Sağlık, Hobiler & Alışkanlıklar">🏃 Sağlık, Hobiler & Alışkanlıklar</button>
+                  <button class="chip" data-cat="Memleket, Şehir & Toplum">🏙️ Memleket & Toplum</button>
+                  <button class="chip" data-cat="İş Dünyası & Kariyer">💼 İş Dünyası & Kariyer</button>
+                  <button class="chip" data-cat="Sinema, Müzik & Kutlamalar">🎬 Sinema, Müzik & Kutlamalar</button>
+                  <button class="chip" data-cat="Fotoğraf, Reklam & Medya">📷 Fotoğraf, Reklam & Medya</button>
+                  <button class="chip" data-cat="Alışveriş, Para & Tüketim">🛍️ Alışveriş & Para</button>
+                  <button class="chip" data-cat="Ulaşım, Araçlar & Spor">🚗 Ulaşım & Araçlar</button>
+                  <button class="chip" data-cat="Seyahat, Tatil & Gelecek Planları">✈️ Seyahat & Turizm</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Question Cards Container -->
+            <div id="qb-cards-container">
+              <!-- Dynamically populated by question_bank.js -->
+            </div>
+
+            <!-- Pagination Bar -->
+            <div id="qb-pagination">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </section>
+
       </main>
     </div>
 
@@ -646,9 +732,9 @@
         <span class="icon">🎯</span>
         <span class="bottom-nav-label">Band</span>
       </a>
-      <a class="bottom-nav-item" data-target="fluency">
-        <span class="icon">🗣️</span>
-        <span class="bottom-nav-label">Fluency</span>
+      <a class="bottom-nav-item" data-target="question-bank">
+        <span class="icon">📚</span>
+        <span class="bottom-nav-label">Sorular</span>
       </a>
       <a class="bottom-nav-item" data-target="grammar-rules">
         <span class="icon">📐</span>
@@ -674,6 +760,14 @@
       </div>
 
       <div class="sheet-grid">
+        <div class="sheet-item" data-target="question-bank">
+          <span class="icon">📚</span>
+          <span>Soru Bankası (193-391)</span>
+        </div>
+        <a href="IELTS_Speaking_Success_in_Speaking_Part2_Soru_Bankasi_Yigit_Sayfa_193_391.pdf" target="_blank" class="sheet-item" style="text-decoration: none; color: var(--brand-purple);">
+          <span class="icon">📗</span>
+          <span>Soru Bankası PDF (199 Sayfa)</span>
+        </a>
         <div class="sheet-item" data-target="essential-tips">
           <span class="icon">💡</span>
           <span>Essential Tips</span>
@@ -717,5 +811,7 @@
   <!-- Scripts -->
   <script src="data.js"></script>
   <script src="app.js"></script>
+  <script src="question_bank_data.js"></script>
+  <script src="question_bank.js"></script>
 </body>
 </html>
